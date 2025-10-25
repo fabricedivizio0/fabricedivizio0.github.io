@@ -1,180 +1,395 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LIGHTRI — Fiches complètes avec cartes</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>LIGHTRI — Trieur (Fiche complète + Visuel recto)</title>
 <style>
-body{font-family:system-ui, sans-serif;background:#f8f9fb;color:#111;margin:0;padding:20px}
-h1{margin-bottom:8px}
-textarea,input,button{font-size:15px;font-family:inherit}
-textarea{width:100%;height:160px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;margin-bottom:12px}
-button{padding:8px 12px;border-radius:8px;border:1px solid #999;cursor:pointer;background:#fff;margin-right:6px}
-button:hover{background:#f2f2f2}
-.note{font-size:13px;color:#666;margin-bottom:12px}
-#cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-top:16px}
-.cardWrap{background:#fff;border-radius:10px;padding:10px;border:1px solid #e6e6e6}
-.info{font-size:13px;white-space:pre-wrap;margin-top:8px;color:#444}
-a.linkImg{display:inline-block;margin-bottom:6px;color:#0b66ff;font-size:13px}
+  :root{--bg:#f8f9fb;--fg:#111;--muted:#666;--card:#fff;--accent:#4caf50}
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0b0c0d;--fg:#e6e6e6;--muted:#aaa;--card:#0b0c0d}
+  }
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; background:var(--bg); color:var(--fg); margin:0; padding:20px}
+  h1{margin:0 0 10px 0;font-weight:600}
+  .note{font-size:13px;color:var(--muted);margin-bottom:12px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+  textarea,input,button{font-family:inherit;font-size:15px}
+  textarea{width:100%;height:180px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;background:var(--card);color:var(--fg)}
+  button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;cursor:pointer}
+  button:hover{background:#f2f2f2}
+  .progress{height:14px;background:#eee;border-radius:8px;overflow:hidden;margin:10px 0}
+  .progress > .bar{height:14px;background:var(--accent);width:0%;transition:width .18s linear}
+  #cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px;margin-top:16px}
+  .cardWrap{background:var(--card);border-radius:10px;padding:12px;border:1px solid #e6e6e6}
+  .outText{white-space:pre-wrap;font-family:inherit;font-size:14px;color:var(--fg);line-height:1.35}
+  .meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:var(--muted);font-size:13px}
+  .linkImg{color:#0b66ff;text-decoration:none;font-weight:600}
+  .small{font-size:13px;color:var(--muted)}
+  .btn-small{padding:6px 10px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer}
 </style>
 </head>
 <body>
-<h1>💳 LIGHTRI — Fiches complètes avec cartes</h1>
-<div class="note">Colle tes fiches ou charge un fichier .txt. Chaque fiche : CardNumber|MM|YYYY|CVV|BankField|FullName|Address|City|Region|Zip|Phone|Email</div>
-<div>
-<input type="file" id="file" accept=".txt"/>
-<button id="process">Traiter</button>
-<button id="download">Télécharger</button>
-<button id="loadExample">Exemple</button>
-</div>
-<textarea id="input" placeholder="Colle ici ton texte brut..."></textarea>
-<div id="cardsGrid"></div>
+  <h1>💳 LIGHTRI — Trieur (Fiche complète + Visuel recto)</h1>
+  <div class="note">Colle tes fiches ci‑dessous (ou charge un .txt). Format par fiche : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code></div>
+
+  <div class="controls">
+    <input id="file" type="file" accept=".txt" />
+    <button id="process">Traiter</button>
+    <button id="download">Télécharger fiches</button>
+    <button id="loadExample">Charger exemple</button>
+  </div>
+
+  <div class="meta">
+    <div class="small">Progrès <span id="counter">0/0</span></div>
+    <div class="small" id="status"></div>
+  </div>
+  <div class="progress"><div class="bar" id="progressBar"></div></div>
+
+  <textarea id="input" placeholder="Colle ici ton texte brut..."></textarea>
+
+  <div id="cardsGrid"></div>
 
 <script>
-/* --------------------------
-  500+ BIN fictifs pour France
---------------------------- */
-const LOCAL_BINS=(function(){
-const banks=["BNP Paribas","Société Générale","Crédit Agricole","La Banque Postale","Caisse d'Épargne","Crédit Mutuel"];
-const levels=["Classic","Gold","Platinum"];
-const types=["Credit","Debit"];
-const schemes=["Visa","MasterCard"];
-const bins={};
-let idx=0;
-for(let b=0;b<banks.length;b++){
-for(let s=0;s<schemes.length;s++){
-for(let l=0;l<levels.length;l++){
-for(let t=0;t<types.length;t++){
-for(let n=0;n<15;n++){
-const bin=(500000+idx).toString();
-bins[bin]={
-bank:banks[b],
-card:schemes[s],
-type:types[t],
-level:levels[l],
-country:"France",
-countrycode:"FR",
-nearest_branch:{
-name:banks[b]+" agence "+(n+1),
-address:(100+n)+" Rue Exemple, 7500"+n+" Paris",
-distance:(0.1+n*0.3).toFixed(1)+" km"
-}
-};
-idx++;
-if(idx>500) break;
-}
-if(idx>500) break;
-}
-if(idx>500) break;
-}
-if(idx>500) break;
-}
-return bins;
+/* ---------------------------
+  LOCAL_BINS (500+ fictifs) — structure complète
+  Chaque entrée : { bank, card (scheme), type, level, country, countrycode }
+  --------------------------- */
+const LOCAL_BINS = (function gen(){
+  const banks = [
+    "BNP PARIBAS","SOCIÉTÉ GÉNÉRALE","CRÉDIT AGRICOLE",
+    "LA BANQUE POSTALE","CAISSE D'EPARGNE","CRÉDIT MUTUEL",
+    "BRED","HSBC FRANCE","LCL","BANQUE POPULAIRE"
+  ];
+  const schemes = ["Visa","MasterCard","Visa","MasterCard","Visa"];
+  const levels = ["CLASSIC","GOLD","PLATINUM","BLACK"];
+  const types = ["CREDIT","DEBIT"];
+  const bins = {};
+  let n=0;
+  // generate ~540 bins with distributed banks
+  for(let b=0; b<banks.length; b++){
+    for(let s=0; s<6; s++){
+      const base = 400000 + (n*7)%150000; // deterministic-ish
+      for(let k=0; k<9 && n<540; k++){
+        const bin = String((base + n) % 900000).padStart(6,"0");
+        bins[bin] = {
+          bank: banks[b],
+          card: schemes[(b + k) % schemes.length],
+          type: types[(b + k) % types.length],
+          level: levels[(n + b) % levels.length],
+          country: "France",
+          countrycode: "FR"
+        };
+        n++;
+      }
+    }
+  }
+  return bins;
 })();
 
-/* Helpers */
-function digitsOnly(s){return(s||'').replace(/\D/g,'');}
-function groupCard(n){return digitsOnly(n).replace(/(\d{4})(?=\d)/g,'$1 ');}
-function pickBinInfo(bin){return LOCAL_BINS[bin]||null;}
-function inferScheme(n){if(/^4/.test(n)) return "Visa"; if(/^5[1-5]/.test(n)) return "MasterCard"; return "Visa";}
+/* UI refs */
+const inputBox = document.getElementById('input');
+const fileInput = document.getElementById('file');
+const cardsGrid = document.getElementById('cardsGrid');
+const progressBar = document.getElementById('progressBar');
+const counterEl = document.getElementById('counter');
+const statusEl = document.getElementById('status');
 
-function buildCardPage(carte,binInfo){
-const scheme=binInfo?binInfo.card:inferScheme(carte.CardNumber);
-const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="340">
-<rect width="600" height="340" rx="24" fill="#eee"/>
-<text x="300" y="160" font-size="40" text-anchor="middle" fill="#333">${scheme}</text>
-<text x="300" y="200" font-size="28" text-anchor="middle" fill="#111">${groupCard(carte.CardNumber)}</text>
-</svg>`;
-const blob=new Blob([svg],{type:"image/svg+xml"});
-return URL.createObjectURL(blob);
+function appendLogToGrid(message){ /* we put logs inline in status */ statusEl.textContent = message; }
+
+/* Simple helpers */
+function digitsOnly(s){ return (s||"").toString().replace(/\D/g,""); }
+function groupCard(n){ return digitsOnly(n).replace(/(\d{4})(?=\d)/g,"$1 "); }
+function pickBinInfo(bin){ return LOCAL_BINS[bin] || null; }
+function inferScheme(digits){
+  if(/^3[47]/.test(digits)) return "AMEX";
+  if(/^4/.test(digits)) return "Visa";
+  if(/^5[1-5]/.test(digits)) return "MasterCard";
+  if(/^6(?:011|5|22)/.test(digits)) return "Discover";
+  return "Visa";
 }
 
-function formatFullInfo(carte,binInfo){
-const b=binInfo||{};
-return `Nom : ${carte.FullName}
-Adresse : ${carte.Address}, ${carte.City} (${carte.City2||''}) ${carte.Zip}
-Téléphone : ${carte.Phone}
-Email : ${carte.Email}
+/* Build a realistic-looking recto SVG for the card.
+   Includes chip, card number, holder name, expiry, small network logo and bank name.
+   Returns a data URL (SVG) and also a blob URL for opening in new tab.
+*/
+function buildCardFrontSVG(carte, binInfo){
+  const width = 1000, height = 620;
+  const digits = digitsOnly(carte.CardNumber);
+  const scheme = (binInfo && binInfo.card) ? binInfo.card : inferScheme(digits);
+  // color palette by scheme (approx)
+  const palettes = {
+    "Visa": ["#213aeb","#1a73e8"],
+    "MasterCard": ["#f44336","#ff9800"],
+    "AMEX": ["#2e7d32","#1b5e20"],
+    "Discover": ["#ffb300","#ff6f00"],
+    "default": ["#6a1b9a","#7b1fa2"]
+  };
+  const pal = palettes[scheme] || palettes.default;
+  const bankName = (binInfo && binInfo.bank) ? binInfo.bank : (carte.BankField || "BANQUE");
 
-Carte :
-Numéro : ${groupCard(carte.CardNumber)}
-BIN : ${carte.BIN}
-Expiration : ${carte.ExpMonth}/${carte.ExpYear}
-CVV : ${carte.CVV}
-Réseau : ${b.card||inferScheme(carte.CardNumber)}
-Banque : ${b.bank||'Non spécifié'}
-Niveau : ${b.level||'Non spécifié'}
-Type : ${b.type||'Non spécifié'}
-Agence la plus proche : ${b.nearest_branch?b.nearest_branch.name+' ('+b.nearest_branch.distance+')':''}
-Adresse agence : ${b.nearest_branch?b.nearest_branch.address:''}`;
+  const numberDisplay = groupCard(carte.CardNumber) || "#### #### #### ####";
+  const holder = (carte.FullName || "TITULAIRE").toUpperCase();
+  const expiry = (carte.ExpMonth || "MM") + "/" + (carte.ExpYear ? carte.ExpYear.toString().slice(-2) : "YY");
+
+  // small network logo SVG
+  function schemeLogo(s){
+    if(s==="Visa") return `<text x="860" y="120" font-family="Arial" font-weight="700" font-size="72" fill="#fff" text-anchor="end">VISA</text>`;
+    if(s==="MasterCard") return `<g transform="translate(760,40)"><circle cx="70" cy="40" r="40" fill="#EB001B"/><circle cx="110" cy="40" r="40" fill="#FF5F00"/></g>`;
+    if(s==="AMEX") return `<text x="860" y="120" font-family="Arial" font-weight="700" font-size="52" fill="#fff" text-anchor="end">AMEX</text>`;
+    if(s==="Discover") return `<text x="860" y="120" font-family="Arial" font-weight="700" font-size="52" fill="#fff" text-anchor="end">DISC</text>`;
+    return `<text x="860" y="120" font-family="Arial" font-weight="700" font-size="52" fill="#fff" text-anchor="end">CARD</text>`;
+  }
+
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Carte bancaire recto">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="${pal[0]}"/>
+        <stop offset="1" stop-color="${pal[1]}"/>
+      </linearGradient>
+      <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#000" flood-opacity="0.3"/>
+      </filter>
+    </defs>
+    <rect width="100%" height="100%" rx="36" ry="36" fill="url(#g)" filter="url(#shadow)"/>
+    <!-- Bank name top-left -->
+    <text x="48" y="96" font-family="Arial" font-size="40" fill="#fff" font-weight="700">${escapeXml(bankName)}</text>
+
+    <!-- Chip -->
+    <g transform="translate(72,180)">
+      <rect x="0" y="0" rx="14" ry="14" width="160" height="120" fill="#d4a24b" />
+      <rect x="12" y="12" width="136" height="96" rx="8" ry="8" fill="#f3e1b3"/>
+      <g fill="#c28a2a" transform="translate(20,28)">
+        <rect x="0" y="0" width="12" height="68" rx="6"/>
+        <rect x="22" y="0" width="12" height="68" rx="6"/>
+        <rect x="44" y="0" width="12" height="68" rx="6"/>
+      </g>
+    </g>
+
+    <!-- Card number -->
+    <text x="${width/2}" y="360" font-family="monospace" font-size="56" fill="#fff" text-anchor="middle" letter-spacing="6">${escapeXml(numberDisplay)}</text>
+
+    <!-- Holder and expiry -->
+    <text x="120" y="480" font-family="Arial" font-size="30" fill="#fff">${escapeXml(holder)}</text>
+    <text x="${width-120}" y="480" font-family="monospace" font-size="30" fill="#fff" text-anchor="end">${escapeXml(expiry)}</text>
+
+    <!-- small network logo -->
+    ${schemeLogo(scheme)}
+    <!-- subtle decorative -->
+    <g fill="#ffffff" fill-opacity="0.06">
+      <rect x="0" y="${height-120}" width="${width}" height="6"/>
+      <rect x="0" y="${height-96}" width="${width}" height="4"/>
+    </g>
+
+  </svg>
+  `;
+  // build data URL and blob URL
+  const svgEncoded = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const blobUrl = URL.createObjectURL(blob);
+  return { dataUrl: svgEncoded, blobUrl, svg };
 }
 
-function createCardEntry(carte,binInfo){
-const wrap=document.createElement('div'); wrap.className='cardWrap';
-const link=document.createElement('a'); link.className='linkImg';
-link.href=buildCardPage(carte,binInfo);
-link.target='_blank';
-link.textContent='Ouvrir l’image de la carte (verso)';
-const info=document.createElement('div'); info.className='info';
-info.textContent=formatFullInfo(carte,binInfo);
-wrap.appendChild(link); wrap.appendChild(info);
-document.getElementById('cardsGrid').appendChild(wrap);
+/* escape for SVG text */
+function escapeXml(unsafe){
+  return (unsafe||'').toString().replace(/[&<>'"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":"&#39;",'"':'&quot;'}[c];
+  });
 }
 
+/* Format the text output exactly like your example, adding bank, level, type, country and nearest agency */
+function formatFullOutput(carte, binInfo, nearestBranch){
+  const bank = binInfo?.bank || (carte.BankField || "Non spécifié");
+  const level = binInfo?.level || "Non spécifié";
+  const type = binInfo?.type || "Non spécifié";
+  const country = binInfo?.country || "France";
+  const bin = carte.BIN || "";
+  const out = [];
+  out.push("💳 +1 IMPO.UHQ");
+  out.push("└ " + groupCard(carte.CardNumber));
+  out.push("");
+  out.push("🏦 Informations Personnelles");
+  out.push("├ 🕵️ Nom complet : " + (carte.FullName || ""));
+  out.push("├ 🏠 Adresse : " + (carte.Address || ""));
+  out.push("├ 📮 Zip : " + (carte.Zip || ""));
+  out.push("├ 🏢 Ville : " + (carte.City || ""));
+  out.push("├ 📞 Numéro de téléphone : " + (carte.Phone || ""));
+  out.push("└ 📧 Email : " + (carte.Email || "Non fourni"));
+  out.push("");
+  out.push("🏦 Carte de Paiement");
+  out.push("├ 🍒 Titulaire : " + (carte.FullName || ""));
+  out.push("├ 💳 Numéro de carte : " + groupCard(carte.CardNumber));
+  out.push("├ 💳 Bin : " + bin);
+  out.push("├ 💳 Banque : " + bank);
+  out.push("├ 💳 Niveau : " + level);
+  out.push("├ 💳 Type : " + type);
+  out.push("├ 🏦 Agence : " + (nearestBranch.name || "Non spécifié"));
+  out.push("├ 🏷️ Adresse agence : " + (nearestBranch.address || "Non spécifiée"));
+  out.push("├ 📅 Expiration : " + (carte.ExpMonth || "") + "/" + (carte.ExpYear || ""));
+  out.push("└ 🔒 Cryptogramme visuel : " + (carte.CVV || ""));
+  // Visual link will be added separately in DOM (not in pure text)
+  return out.join("\n");
+}
+
+/* Build nearest branch info (same bank) using user's city & zip—approximate/fictive but local */
+function buildNearestBranch(binInfo, carte){
+  const bank = binInfo?.bank || (carte.BankField || "Banque");
+  const city = carte.City || "Ville";
+  const zip = carte.Zip || "";
+  const addr = `${bank} agence ${city} — ${zip}`;
+  const distKm = (Math.random()*1.2 + 0.1).toFixed(1) + " km";
+  return { name: `${bank} agence ${city}`, address: addr, distance: distKm };
+}
+
+/* Main processing: parse lines, validate number length 13..19, produce fiche, create link to image page */
 async function processText(text){
-const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).filter(l=>l.includes('|'));
-document.getElementById('cardsGrid').innerHTML='';
-for(let i=0;i<lines.length;i++){
-const parts=lines[i].split('|').map(p=>p.trim());
-while(parts.length<12) parts.push('');
-const carte={
-CardNumber: parts[0],
-ExpMonth: parts[1],
-ExpYear: parts[2],
-CVV: parts[3],
-BankField: parts[4],
-FullName: parts[5],
-Address: parts[6],
-City: parts[7],
-City2: parts[8],
-Zip: parts[9],
-Phone: parts[10],
-Email: parts[11]
-};
-carte.BIN=digitsOnly(carte.CardNumber).slice(0,6);
-const binInfo=pickBinInfo(carte.BIN);
-createCardEntry(carte,binInfo);
+  cardsGrid.innerHTML = "";
+  progressBar.style.width = "0%";
+  statusEl.textContent = "";
+  const rawLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const lines = rawLines.filter(l => l.includes("|"));
+  if(lines.length === 0){ alert("Aucune fiche valide trouvée (attendu séparateur |)."); return; }
+  const total = lines.length;
+  let processed = 0;
+  counterEl.textContent = `${processed}/${total}`;
+
+  const BATCH = 6;
+  for(let start=0; start<lines.length; start+=BATCH){
+    const batch = lines.slice(start, start+BATCH);
+    await Promise.all(batch.map(async (line, idx) => {
+      const i = start + idx + 1;
+      const parts = line.split("|").map(p => p.trim());
+      while(parts.length < 12) parts.push("");
+      const carte = {
+        CardNumber: parts[0] || "",
+        ExpMonth: parts[1] || "",
+        ExpYear: parts[2] || "",
+        CVV: parts[3] || "",
+        BankField: parts[4] || "",
+        FullName: parts[5] || "",
+        Address: parts[6] || "",
+        City: parts[7] || "",
+        City2: parts[8] || "",
+        Zip: parts[9] || "",
+        Phone: parts[10] || "",
+        Email: parts[11] || ""
+      };
+      const digits = digitsOnly(carte.CardNumber);
+      if(digits.length < 13 || digits.length > 19){
+        appendLogToGrid(`⚠️ Fiche #${i} : numéro invalide (longueur ${digits.length}) — ignorée`);
+        processed++; counterEl.textContent = `${processed}/${total}`; progressBar.style.width = `${Math.round((processed/total)*100)}%`;
+        return;
+      }
+      carte.BIN = digits.slice(0,6);
+      const binInfo = pickBinInfo(carte.BIN);
+      const scheme = (binInfo && binInfo.card) ? binInfo.card : inferScheme(digits);
+      const nearestBranch = buildNearestBranch(binInfo, carte);
+
+      // create SVG recto and get blob url
+      const svgObj = buildCardFrontSVG(carte, binInfo);
+      // create entry DOM
+      const wrap = document.createElement("div");
+      wrap.className = "cardWrap";
+
+      // text block as in example
+      const outText = formatFullOutput(carte, binInfo, nearestBranch);
+      const pre = document.createElement("div");
+      pre.className = "outText";
+      pre.textContent = outText;
+
+      // link to open recto image in new tab — we use blobUrl for easy open and download
+      const link = document.createElement("a");
+      link.className = "linkImg";
+      link.href = svgObj.blobUrl;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "🎨 Visuel (ouvrir recto)";
+
+      // small download button
+      const dl = document.createElement("button");
+      dl.className = "btn-small";
+      dl.textContent = "Télécharger l'image";
+      dl.addEventListener("click", (e) => {
+        e.preventDefault();
+        const a = document.createElement("a");
+        a.href = svgObj.blobUrl;
+        // filename derived from BIN and last4
+        const last4 = digits.slice(-4);
+        a.download = `card_${carte.BIN || 'unknown'}_${last4}.svg`;
+        document.body.appendChild(a); a.click(); a.remove();
+      });
+
+      // append elements
+      const topRow = document.createElement("div");
+      topRow.style.display = "flex";
+      topRow.style.justifyContent = "space-between";
+      topRow.style.alignItems = "center";
+      topRow.style.gap = "8px";
+      const left = document.createElement("div"); left.appendChild(pre);
+      const right = document.createElement("div");
+      right.style.display = "flex"; right.style.flexDirection = "column"; right.style.alignItems = "flex-end"; right.style.gap = "8px";
+      right.appendChild(link); right.appendChild(dl);
+
+      topRow.appendChild(left); topRow.appendChild(right);
+      wrap.appendChild(topRow);
+
+      // add to grid
+      cardsGrid.appendChild(wrap);
+
+      appendLogToGrid(`Traitement fiche #${i} — BIN ${carte.BIN} — ${binInfo?.bank || 'Bank unknown'}`);
+      processed++; counterEl.textContent = `${processed}/${total}`; progressBar.style.width = `${Math.round((processed/total)*100)}%`;
+    }));
+    // small pause for UI
+    await new Promise(r => setTimeout(r, 60));
+  }
+
+  appendLogToGrid(`✅ Traitement terminé — ${total} fiches analysées.`);
 }
-}
 
-/* Events */
-document.getElementById('process').addEventListener('click',()=>{ 
-const t=document.getElementById('input').value.trim();
-if(t) processText(t);
-else alert("Colle ton texte ou ajoute un fichier .txt");
+/* Download all fiches (text) aggregated */
+document.getElementById('download').addEventListener('click', ()=>{
+  const blocks = Array.from(document.querySelectorAll('.outText')).map(n=>n.textContent);
+  if(blocks.length === 0){ alert("Rien à télécharger."); return; }
+  const blob = new Blob([blocks.join("\n\n")], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "LIGHTRI_fiches_completes.txt"; document.body.appendChild(a); a.click(); a.remove();
 });
 
-document.getElementById('loadExample').addEventListener('click',()=>{
-document.getElementById('input').value=`5539791646892300 | 12 | 2025 | 257 | FRANCE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr
-5133791059685621 | 02 | 2026 | 500 | FRANCE | Dicanot | 42 boulevard Dubreuil | BuressurYvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com
-4970407109386230 | 01 | 2026 | 116 | FRANCE | Remi Vallette | 18 avenue linn | Savigny sur orge | Savigny sur orge | 91600 | 0684204360 | remi.vallette@gmail.com
-5137707170853795 | 09 | 2026 | 246 | FRANCE | Auguste F Gosselin | 39 Place du Jeu de Paume | VILLEJUIF | Ile-de-France | 94800 | 443824-7792 | xmasmom4@yahoo.com`;
+/* Events: process button, load example, file input */
+document.getElementById('process').addEventListener('click', async ()=>{
+  const t = inputBox.value.trim();
+  if(t) await processText(t);
+  else if(fileInput.files.length > 0){
+    const txt = await fileInput.files[0].text();
+    inputBox.value = txt;
+    await processText(txt);
+  } else alert("Colle ton texte ou ajoute un fichier .txt.");
 });
 
-document.getElementById('download').addEventListener('click',()=>{
-const blocks=Array.from(document.querySelectorAll('.info')).map(e=>e.textContent);
-if(blocks.length===0){alert('Rien à télécharger'); return;}
-const blob=new Blob([blocks.join('\n\n')],{type:'text/plain'});
-const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lightri_full_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
+document.getElementById('loadExample').addEventListener('click', ()=>{
+  inputBox.value = [
+    "4974027540458210 | 07 | 2027 | 575 | FRANCE | António Lamego | 5 Rue de la Voie Verte | Juvisy-sur-Orge | Ile-de-France | 91260 | 0615788638 |",
+    "5539791646892300 | 12 | 2025 | 257 | FRANCE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr",
+    "5133791059685621 | 02 | 2026 | 500 | FRANCE | Dicanot | 42 boulevard Dubreuil | Bures-sur-Yvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com",
+    "4970407109386230 | 01 | 2026 | 116 | FRANCE | Remi Vallette | 18 avenue linn | Savigny-sur-Orge | Essonne | 91600 | 0684204360 | remi.vallette@gmail.com",
+    "5137707170853795 | 09 | 2026 | 246 | FRANCE | Auguste F Gosselin | 39 Place du Jeu de Paume | Villejuif | Ile-de-France | 94800 | 4438247792 | xmasmom4@yahoo.com"
+  ].join("\n");
 });
 
-document.getElementById('file').addEventListener('change',async(e)=>{
-if(e.target.files.length>0){
-const text=await e.target.files[0].text();
-document.getElementById('input').value=text;
-processText(text);
-}
+fileInput.addEventListener('change', async (e) => {
+  if(!e.target.files.length) return;
+  const f = e.target.files[0];
+  if(f.name.toLowerCase().endsWith('.txt')){
+    const txt = await f.text();
+    inputBox.value = txt;
+    await processText(txt);
+  } else {
+    // ignore other file types for now
+    const txt = await f.text();
+    inputBox.value = txt;
+  }
 });
+
+/* End script */
 </script>
 </body>
 </html>
