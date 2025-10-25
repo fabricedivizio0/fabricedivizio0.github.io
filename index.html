@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LIGHTRI — Fiches sobres + Logs erreurs</title>
+<title>LIGHTRI — Fiches sobres (validation BIN minimale)</title>
 <style>
 body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#f8f9fb;color:#111;margin:0;padding:20px}
 h1{margin:0 0 8px 0;font-weight:600}
@@ -17,13 +17,17 @@ button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;
 #cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(720px,1fr));gap:12px;margin-top:16px}
 .cardWrap{background:#fff;border-radius:10px;padding:12px;border:1px solid #e6e6e6;display:flex;flex-direction:column;gap:8px}
 .cardText{white-space:pre-wrap;font-family:inherit;font-size:14px;color:#111;line-height:1.35}
-#errorLog{height:120px;background:#fff0f0;border:1px solid #f99;padding:8px;overflow:auto;font-size:13px;color:#900;white-space:pre-wrap;margin-top:12px;border-radius:6px;}
+#errorLog{height:140px;background:#fff0f0;border:1px solid #f99;padding:8px;overflow:auto;font-size:13px;color:#900;white-space:pre-wrap;margin-top:12px;border-radius:6px;}
 .small{font-size:13px;color:#666}
+code{background:#f4f4f6;padding:2px 6px;border-radius:4px}
 </style>
 </head>
 <body>
 <h1>💳 LIGHTRI — Fiches sobres</h1>
-<div class="note">Colle ton texte ou charge un fichier .txt. Format par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code></div>
+<div class="note">
+  Colle ton texte ou charge un fichier <code>.txt</code>.  
+  Format par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code>
+</div>
 
 <div class="controls">
   <input id="file" type="file" accept=".txt,.json" />
@@ -39,11 +43,14 @@ button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;
 
 <div id="cardsGrid"></div>
 
-<div class="note">Erreurs :</div>
-<div id="errorLog"></div>
+<div class="note">Erreurs (uniquement) :</div>
+<div id="errorLog" aria-live="polite"></div>
 
 <script>
-const BINLIST_BASE = 'https://lookup.binlist.net/';
+/* CONFIG */
+const BINLIST_BASE = 'https://lookup.binlist.net/'; // Binlist public
+
+/* UI refs */
 const inputBox = document.getElementById('input');
 const fileInput = document.getElementById('file');
 const cardsGrid = document.getElementById('cardsGrid');
@@ -53,132 +60,182 @@ const statusEl = document.getElementById('status');
 const errorLog = document.getElementById('errorLog');
 
 function setStatus(s){ statusEl.textContent = s; }
-function updateProgress(done,total){ counterEl.textContent = `${done}/${total}`; progressBar.style.width = total? (done/total*100)+'%':'0%'; }
+function updateProgress(done,total){ counterEl.textContent = `${done}/${total}`; progressBar.style.width = total ? Math.round((done/total)*100) + '%' : '0%'; }
 function digitsOnly(s){ return (s||'').toString().replace(/\D/g,''); }
 function groupCard(num){ return digitsOnly(num).replace(/(\d{4})(?=\d)/g,'$1 '); }
-function logError(msg){ errorLog.textContent += msg + "\n"; errorLog.scrollTop = errorLog.scrollHeight; }
+function logError(msg){ errorLog.textContent += msg + '\\n'; errorLog.scrollTop = errorLog.scrollHeight; }
 
+/* fetch BIN info (Binlist) */
 async function fetchBinInfo(bin){
   try{
     const res = await fetch(BINLIST_BASE + encodeURIComponent(bin), { headers: { 'Accept-Version':'3' }});
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
     const j = await res.json();
     return {
       bankName: j.bank?.name || j.bank || 'Non spécifié',
       brand: j.brand || j.scheme || 'CLASSIC',
       type: (j.type || '').toUpperCase() || 'CREDIT',
-      country: j.country?.name || ''
+      country: j.country?.name || j.country?.alpha2 || ''
     };
   }catch(e){
-    logError('Erreur BIN '+bin+' : '+ e.message);
+    logError('Erreur BIN ' + bin + ' : ' + e.message);
     return { bankName:'Non spécifié', brand:'CLASSIC', type:'CREDIT', country:'' };
   }
 }
 
+/* build fiche text */
 function buildFicheText(carte, binInfo){
   const lines = [];
   lines.push('💳 +1 IMPO.UHQ');
-  lines.push('└ '+groupCard(carte.CardNumber));
+  lines.push('└ ' + groupCard(carte.CardNumber));
   lines.push('');
   lines.push('🏦 Informations Personnelles');
-  lines.push('├ 🕵️ Nom complet : '+(carte.FullName||''));
-  lines.push('├ 🏠 Adresse : '+(carte.Address||''));
-  lines.push('├ 📮 Zip : '+(carte.Zip||''));
-  lines.push('├ 🏢 Ville : '+(carte.City||''));
-  lines.push('├ 📞 Numéro de téléphone : '+(carte.Phone||''));
-  lines.push('└ 📧 Email : '+(carte.Email||'Non fourni'));
+  lines.push('├ 🕵️ Nom complet : ' + (carte.FullName || ''));
+  lines.push('├ 🏠 Adresse : ' + (carte.Address || ''));
+  lines.push('├ 📮 Zip : ' + (carte.Zip || ''));
+  lines.push('├ 🏢 Ville : ' + (carte.City || ''));
+  lines.push('├ 📞 Numéro de téléphone : ' + (carte.Phone || ''));
+  lines.push('└ 📧 Email : ' + (carte.Email || 'Non fourni'));
   lines.push('');
   lines.push('🏦 Carte de Paiement');
-  lines.push('├ 🍒 Titulaire : '+(carte.FullName||''));
-  lines.push('├ 💳 Numéro de carte : '+groupCard(carte.CardNumber));
-  lines.push('├ 💳 Bin : '+(carte.BIN||''));
-  lines.push('├ 💳 Banque : '+binInfo.bankName);
-  lines.push('├ 💳 Niveau : '+binInfo.brand.toUpperCase());
-  lines.push('├ 💳 Type : '+binInfo.type.toUpperCase());
-  lines.push('├ 📅 Expiration : '+(carte.ExpMonth||'')+'/'+(carte.ExpYear||''));
-  lines.push('└ 🔒 Cryptogramme visuel : '+(carte.CVV||''));
-  return lines.join("\n");
+  lines.push('├ 🍒 Titulaire : ' + (carte.FullName || ''));
+  lines.push('├ 💳 Numéro de carte : ' + groupCard(carte.CardNumber));
+  lines.push('├ 💳 Bin : ' + (carte.BIN || ''));
+  lines.push('├ 💳 Banque : ' + binInfo.bankName);
+  lines.push('├ 💳 Niveau : ' + binInfo.brand.toUpperCase());
+  lines.push('├ 💳 Type : ' + binInfo.type.toUpperCase());
+  lines.push('├ 📅 Expiration : ' + (carte.ExpMonth || '') + '/' + (carte.ExpYear || ''));
+  lines.push('└ 🔒 Cryptogramme visuel : ' + (carte.CVV || ''));
+  return lines.join('\\n');
 }
 
+/* parse lines and keep original cleaning rule */
 function parseLines(text){
-  return text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
-    const cleaned = line.replace(/^\d{8,}\s*/, "");
+  return text.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean).map(line => {
+    const cleaned = line.replace(/^\\d{8,}\\s*/, "");
     if(!cleaned.includes("|")){
-      logError('Ignoré (pas de séparateur "|") : '+line);
+      logError('Ignoré (pas de séparateur "|") : ' + line);
       return null;
     }
     return cleaned;
   }).filter(Boolean);
 }
 
+/* main processor: validation relaxed -> only require 6 digits for BIN */
 async function processText(raw){
   cardsGrid.innerHTML = '';
   errorLog.textContent = '';
   setStatus('Traitement...');
   const lines = parseLines(raw);
-  if(lines.length===0){ setStatus('Aucune fiche'); return; }
-  let done=0;
+  if(lines.length === 0){ setStatus('Aucune fiche'); return; }
+  let done = 0;
   const total = lines.length;
   updateProgress(done,total);
 
-  for(const line of lines){
-    const parts = line.split('|').map(p=>p.trim());
-    while(parts.length<12) parts.push('');
-    const carte = {
-      CardNumber: parts[0],
-      ExpMonth: parts[1],
-      ExpYear: parts[2],
-      CVV: parts[3],
-      BankField: parts[4],
-      FullName: parts[5],
-      Address: parts[6],
-      City: parts[7],
-      Region: parts[8],
-      Zip: parts[9],
-      Phone: parts[10],
-      Email: parts[11]
-    };
-    const digits = digitsOnly(carte.CardNumber);
-    if(digits.length<13 || digits.length>19){
-      logError('Carte invalide (longueur PAN) : '+carte.CardNumber);
-      done++; updateProgress(done,total); continue;
-    }
-    carte.BIN = digits.slice(0,6);
+  // small batches to avoid hammering public API
+  const BATCH = 6;
+  for(let i=0;i<lines.length;i+=BATCH){
+    const batch = lines.slice(i, i+BATCH);
+    await Promise.all(batch.map(async (line) => {
+      const parts = line.split('|').map(p => p.trim());
+      while(parts.length < 12) parts.push('');
+      const carte = {
+        CardNumber: parts[0],
+        ExpMonth: parts[1],
+        ExpYear: parts[2],
+        CVV: parts[3],
+        BankField: parts[4],
+        FullName: parts[5],
+        Address: parts[6],
+        City: parts[7],
+        Region: parts[8],
+        Zip: parts[9],
+        Phone: parts[10],
+        Email: parts[11]
+      };
 
-    const binInfo = await fetchBinInfo(carte.BIN);
-    const ficheText = buildFicheText(carte, binInfo);
+      const digits = digitsOnly(carte.CardNumber);
+      // now require only at least 6 digits to extract BIN
+      if(digits.length < 6){
+        logError('Carte ignorée (trop courte pour BIN) : ' + carte.CardNumber);
+        done++; updateProgress(done,total);
+        return;
+      }
+      carte.BIN = digits.slice(0,6);
 
-    const wrap = document.createElement('div'); wrap.className='cardWrap';
-    const textDiv = document.createElement('div'); textDiv.className='cardText'; textDiv.textContent = ficheText;
-    wrap.appendChild(textDiv);
-    cardsGrid.appendChild(wrap);
+      // fetch bin info (Binlist)
+      const binInfo = await fetchBinInfo(carte.BIN);
+      const fiche = buildFicheText(carte, binInfo);
 
-    done++; updateProgress(done,total);
+      // append to UI
+      const wrap = document.createElement('div'); wrap.className = 'cardWrap';
+      const txt = document.createElement('div'); txt.className = 'cardText'; txt.textContent = fiche;
+      wrap.appendChild(txt);
+      cardsGrid.appendChild(wrap);
+
+      done++; updateProgress(done,total);
+    }));
+    // polite pause
+    await new Promise(r => setTimeout(r, 120));
   }
-  setStatus('Terminé — '+total+' fiches.');
+
+  setStatus('Terminé — ' + total + ' fiches.');
 }
 
 /* UI wiring */
-document.getElementById('process').addEventListener('click', ()=>processText(inputBox.value.trim()));
-document.getElementById('download').addEventListener('click', ()=>{
-  const texts = Array.from(document.querySelectorAll('.cardText')).map(n=>n.textContent);
+document.getElementById('process').addEventListener('click', () => processText(inputBox.value.trim()));
+
+document.getElementById('download').addEventListener('click', () => {
+  const texts = Array.from(document.querySelectorAll('.cardText')).map(n => n.textContent);
   if(!texts.length){ alert('Rien à télécharger'); return; }
-  const blob = new Blob([texts.join("\n\n")], {type:"text/plain;charset=utf-8"});
+  const blob = new Blob([texts.join('\\n\\n')], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'LIGHTRI_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
 });
-fileInput.addEventListener('change', async (e)=>{
+
+/* file load */
+fileInput.addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if(!f) return;
+  if(f.name.toLowerCase().endsWith('.json')){
+    // optional: load local bins.json to override binlookups (not mandatory)
+    try{
+      const txt = await f.text();
+      const parsed = JSON.parse(txt);
+      if(parsed && typeof parsed === 'object'){
+        window.__USER_BINS = parsed;
+        alert('bins.json chargé localement (utilisé pour lookups si présent).');
+        // override fetchBinInfo to check __USER_BINS first
+        const orig = fetchBinInfo;
+        window.fetchBinInfo = async function(bin){
+          try{
+            if(window.__USER_BINS && window.__USER_BINS[bin]){
+              const v = window.__USER_BINS[bin];
+              return {
+                bankName: v.bank || v.bank_name || v.bankName || '',
+                brand: v.brand || v.level || v.scheme || '',
+                type: (v.type || '').toUpperCase() || '',
+                country: v.country || v.country_name || v.country_code || ''
+              };
+            }
+          }catch(e){}
+          return orig(bin);
+        };
+      } else alert('JSON bins invalide');
+    }catch(err){ alert('Erreur lecture JSON: ' + err.message); }
+    return;
+  }
   const txt = await f.text();
   inputBox.value = txt;
   processText(txt);
 });
 
-/* Exemple de fiches */
+/* load example */
 document.getElementById('loadExample').addEventListener('click', ()=>{
-  inputBox.value = `4970407109386230 | 01 | 2026 | 116 | CRÉDIT AGRICOLE | Remi Vallette | 18 avenue linn | Savigny sur orge | Ile-de-France | 91600 | 0684204360 | remi.vallette@gmail.com
-5133791059685621 | 02 | 2026 | 500 | BNP PARIBAS | Dicanot | 42 boulevard Dubreuil | BuressurYvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com
-5539791646892300 | 12 | 2025 | 257 | SOCIETE GENERALE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr`;
+  inputBox.value = [
+    "4970407109386230 | 01 | 2026 | 116 | CRÉDIT AGRICOLE | Remi Vallette | 18 avenue linn | Savigny sur orge | Ile-de-France | 91600 | 0684204360 | remi.vallette@gmail.com",
+    "5133791059685621 | 02 | 2026 | 500 | BNP PARIBAS | Dicanot | 42 boulevard Dubreuil | Bures-sur-Yvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com",
+    "5539791646892300 | 12 | 2025 | 257 | SOCIETE GENERALE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr"
+  ].join('\\n');
   processText(inputBox.value);
 });
 </script>
