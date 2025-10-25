@@ -1,356 +1,179 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LIGHTRI — Trieur (Verso SVG, Fiche complète)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIGHTRI — Fiches complètes avec cartes</title>
 <style>
-  :root{--bg:#f8f9fb;--fg:#111;--muted:#666}
-  @media (prefers-color-scheme:dark){
-    :root{--bg:#0b0c0d;--fg:#e6e6e6;--muted:#aaa}
-  }
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--fg);margin:0;padding:20px}
-  h1{margin:0 0 8px 0;font-weight:600}
-  .note{font-size:13px;color:var(--muted);margin-bottom:12px}
-  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  textarea,input,button{font:15px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-  textarea{width:100%;height:160px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;background:#fff;color:var(--fg)}
-  button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;cursor:pointer}
-  .progress{height:14px;background:#eee;border-radius:8px;overflow:hidden;margin:10px 0}
-  .progress > .bar{height:14px;background:#4caf50;width:0%;transition:width .18s linear}
-  #log{height:120px;overflow:auto;padding:8px;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa;font-size:13px}
-  #cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-top:16px}
-  .cardWrap{background:#fff;border-radius:10px;padding:10px;border:1px solid #e6e6e6}
-  .cardImage{width:100%;height:auto;border-radius:8px;display:block;margin-bottom:8px}
-  .info{font-size:13px;color:var(--muted);white-space:pre-wrap;margin-top:8px}
-  a.linkImg{display:inline-block;margin-bottom:6px;color:#0b66ff;font-size:13px}
-  .small{font-size:13px;color:var(--muted)}
-  .metaRow{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+body{font-family:system-ui, sans-serif;background:#f8f9fb;color:#111;margin:0;padding:20px}
+h1{margin-bottom:8px}
+textarea,input,button{font-size:15px;font-family:inherit}
+textarea{width:100%;height:160px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;margin-bottom:12px}
+button{padding:8px 12px;border-radius:8px;border:1px solid #999;cursor:pointer;background:#fff;margin-right:6px}
+button:hover{background:#f2f2f2}
+.note{font-size:13px;color:#666;margin-bottom:12px}
+#cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-top:16px}
+.cardWrap{background:#fff;border-radius:10px;padding:10px;border:1px solid #e6e6e6}
+.info{font-size:13px;white-space:pre-wrap;margin-top:8px;color:#444}
+a.linkImg{display:inline-block;margin-bottom:6px;color:#0b66ff;font-size:13px}
 </style>
 </head>
 <body>
-  <h1>💳 LIGHTRI — Trieur (Verso SVG, Fiche complète)</h1>
-  <div class="note">Colle tes fiches ci‑dessous ou charge un <code>.txt</code>. Chaque fiche : champs séparés par <code>|</code> (CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email). Tout hors ligne. La fiche triée affiche désormais la banque, le pays, le réseau, le niveau et le type.</div>
-
-  <div class="controls">
-    <input id="file" type="file" accept=".txt,.json" />
-    <button id="process">Traiter</button>
-    <button id="download">Télécharger</button>
-    <button id="loadExample">Charger exemple</button>
-  </div>
-
-  <div class="metaRow">
-    <div class="small">Progrès <span id="counter">0/0</span></div>
-    <div class="small" id="status"></div>
-  </div>
-  <div class="progress"><div class="bar" id="progressBar"></div></div>
-
-  <textarea id="input" placeholder="Colle ici ton texte brut..."></textarea>
-  <div style="height:12px"></div>
-  <div id="log" aria-live="polite"></div>
-
-  <div id="cardsGrid"></div>
+<h1>💳 LIGHTRI — Fiches complètes avec cartes</h1>
+<div class="note">Colle tes fiches ou charge un fichier .txt. Chaque fiche : CardNumber|MM|YYYY|CVV|BankField|FullName|Address|City|Region|Zip|Phone|Email</div>
+<div>
+<input type="file" id="file" accept=".txt"/>
+<button id="process">Traiter</button>
+<button id="download">Télécharger</button>
+<button id="loadExample">Exemple</button>
+</div>
+<textarea id="input" placeholder="Colle ici ton texte brut..."></textarea>
+<div id="cardsGrid"></div>
 
 <script>
-/* -------------------------
-   LOCAL_BINS (généré ~600 entries)
-   contient maintenant : scheme, bank.name, country.name, brand, type
-   ------------------------- */
-const LOCAL_BINS = (function(){
-  const bins = {};
-  const prefixes = [
-    {start:400000,count:80,scheme:"Visa"},
-    {start:410000,count:60,scheme:"Visa"},
-    {start:420000,count:40,scheme:"Visa"},
-    {start:510000,count:70,scheme:"MasterCard"},
-    {start:520000,count:50,scheme:"MasterCard"},
-    {start:530000,count:40,scheme:"MasterCard"},
-    {start:540000,count:30,scheme:"MasterCard"},
-    {start:550000,count:50,scheme:"MasterCard"},
-    {start:340000,count:30,scheme:"AMEX"},
-    {start:370000,count:20,scheme:"AMEX"},
-    {start:601100,count:30,scheme:"Discover"},
-    {start:622126,count:20,scheme:"Discover"},
-    {start:352800,count:10,scheme:"JCB"},
-    {start:675900,count:15,scheme:"Maestro"}
-  ];
-  let bankIdx = 1;
-  const countries = ["France","USA","UK","Germany","Spain","Italy","Netherlands","Canada","Brazil","Australia"];
-  prefixes.forEach(p=>{
-    const end = p.start + p.count;
-    for(let v=p.start; v<end; v++){
-      const bin = String(v).padStart(6,"0");
-      const scheme = p.scheme;
-      bins[bin] = {
-        scheme: scheme,
-        brand: (scheme==="Visa" ? "Classic" : (scheme==="MasterCard" ? "Gold" : scheme==="AMEX" ? "Platinum" : "Standard")),
-        type: (scheme==="AMEX" ? "Credit" : (scheme==="Discover" ? "Debit" : "Credit")),
-        bank: { name: `Banque ${String(bankIdx).padStart(3,"0")}` },
-        country: { name: countries[bankIdx % countries.length] }
-      };
-      bankIdx++; if(bankIdx>999) bankIdx=1;
-    }
-  });
-  return bins;
+/* --------------------------
+  500+ BIN fictifs pour France
+--------------------------- */
+const LOCAL_BINS=(function(){
+const banks=["BNP Paribas","Société Générale","Crédit Agricole","La Banque Postale","Caisse d'Épargne","Crédit Mutuel"];
+const levels=["Classic","Gold","Platinum"];
+const types=["Credit","Debit"];
+const schemes=["Visa","MasterCard"];
+const bins={};
+let idx=0;
+for(let b=0;b<banks.length;b++){
+for(let s=0;s<schemes.length;s++){
+for(let l=0;l<levels.length;l++){
+for(let t=0;t<types.length;t++){
+for(let n=0;n<15;n++){
+const bin=(500000+idx).toString();
+bins[bin]={
+bank:banks[b],
+card:schemes[s],
+type:types[t],
+level:levels[l],
+country:"France",
+countrycode:"FR",
+nearest_branch:{
+name:banks[b]+" agence "+(n+1),
+address:(100+n)+" Rue Exemple, 7500"+n+" Paris",
+distance:(0.1+n*0.3).toFixed(1)+" km"
+}
+};
+idx++;
+if(idx>500) break;
+}
+if(idx>500) break;
+}
+if(idx>500) break;
+}
+if(idx>500) break;
+}
+return bins;
 })();
 
-/* UI refs */
-const inputBox = document.getElementById('input');
-const fileInput = document.getElementById('file');
-const cardsGrid = document.getElementById('cardsGrid');
-const logBox = document.getElementById('log');
-const progressBar = document.getElementById('progressBar');
-const counter = document.getElementById('counter');
-const status = document.getElementById('status');
+/* Helpers */
+function digitsOnly(s){return(s||'').replace(/\D/g,'');}
+function groupCard(n){return digitsOnly(n).replace(/(\d{4})(?=\d)/g,'$1 ');}
+function pickBinInfo(bin){return LOCAL_BINS[bin]||null;}
+function inferScheme(n){if(/^4/.test(n)) return "Visa"; if(/^5[1-5]/.test(n)) return "MasterCard"; return "Visa";}
 
-function appendLog(s){ logBox.textContent += `[${new Date().toLocaleTimeString()}] ${s}\n`; logBox.scrollTop = logBox.scrollHeight; }
-
-/* helpers */
-function sanitize(s){ return (s||'').toString().trim(); }
-function digitsOnly(s){ return sanitize(s).replace(/\D/g,''); }
-function pickBinInfo(bin){ return LOCAL_BINS[bin] || null; }
-
-const SCHEME_STYLE = {
-  "Visa": {colors:["#1A56DB","#2D9CDB"], logo:"VISA"},
-  "MasterCard": {colors:["#FF5F00","#EB001B"], logo:"MC"},
-  "AMEX": {colors:["#2E7D32","#1B5E20"], logo:"AMEX"},
-  "Discover": {colors:["#FFB300","#FF6F00"], logo:"DISC"},
-  "JCB": {colors:["#0B4F78","#6BB1E1"], logo:"JCB"},
-  "Maestro": {colors:["#37474F","#455A64"], logo:"MAE"},
-  "default": {colors:["#6a1b9a","#7b1fa2"], logo:"CARD"}
-};
-
-function groupCard(num){ return digitsOnly(num).replace(/(\d{4})(?=\d)/g,'$1 '); }
-
-/* SVG logo small */
-function logoSVG(code){
-  if(code==="VISA"){
-    return `<rect width="240" height="120" rx="12" fill="#fff"/><text x="120" y="70" font-family="Arial" font-size="56" fill="#1A56DB" font-weight="700" text-anchor="middle">VISA</text>`;
-  } else if(code==="MC"){
-    return `<rect width="240" height="120" rx="12" fill="#fff"/><circle cx="88" cy="60" r="36" fill="#EB001B"/><circle cx="152" cy="60" r="36" fill="#FF5F00"/><text x="120" y="110" font-family="Arial" font-size="22" fill="#222" text-anchor="middle">MasterCard</text>`;
-  } else if(code==="AMEX"){
-    return `<rect width="240" height="120" rx="12" fill="#fff"/><text x="120" y="75" font-family="Arial" font-size="42" fill="#0B6623" font-weight="700" text-anchor="middle">AMEX</text>`;
-  } else if(code==="DISC"){
-    return `<rect width="240" height="120" rx="12" fill="#fff"/><circle cx="86" cy="60" r="36" fill="#FFB300"/><circle cx="154" cy="60" r="28" fill="#FF6F00"/><text x="120" y="110" font-family="Arial" font-size="22" fill="#222" text-anchor="middle">Discover</text>`;
-  } else if(code==="JCB"){
-    return `<rect width="240" height="120" rx="12" fill="#fff"/><rect x="22" y="20" width="196" height="80" fill="#0B4F78"/><text x="120" y="75" font-family="Arial" font-size="36" fill="#fff" text-anchor="middle">JCB</text>`;
-  } else if(code==="MAE"){
-    return `<rect width="240" height="120" rx="12" fill="#fff"/><text x="120" y="75" font-family="Arial" font-size="28" fill="#333" text-anchor="middle">Maestro</text>`;
-  } else {
-    return `<rect width="240" height="120" rx="12" fill="#fff"/><text x="120" y="75" font-family="Arial" font-size="36" fill="#333" text-anchor="middle">CARD</text>`;
-  }
+function buildCardPage(carte,binInfo){
+const scheme=binInfo?binInfo.card:inferScheme(carte.CardNumber);
+const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="340">
+<rect width="600" height="340" rx="24" fill="#eee"/>
+<text x="300" y="160" font-size="40" text-anchor="middle" fill="#333">${scheme}</text>
+<text x="300" y="200" font-size="28" text-anchor="middle" fill="#111">${groupCard(carte.CardNumber)}</text>
+</svg>`;
+const blob=new Blob([svg],{type:"image/svg+xml"});
+return URL.createObjectURL(blob);
 }
 
-/* Build SVG verso */
-function buildCardBackSVG(carte, scheme, binInfo){
-  const w = 1000, h = 620;
-  const bg = SCHEME_STYLE[scheme]?.colors || SCHEME_STYLE.default.colors;
-  const gradientId = "g" + Math.random().toString(36).slice(2,8);
-  const holder = (carte.FullName||"").toUpperCase();
-  const cvv = carte.CVV || "***";
-  const sigSample = (holder || "SIGNATURE").slice(0,24);
-  const leftInfo = `BIN: ${carte.BIN || "------"}`;
-  const logoText = SCHEME_STYLE[scheme]?.logo || SCHEME_STYLE.default.logo;
-  const bankName = binInfo?.bank?.name || "";
-
-  return `
-  <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Carte verso">
-    <defs>
-      <linearGradient id="${gradientId}" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="${bg[0]}"/>
-        <stop offset="1" stop-color="${bg[1]}"/>
-      </linearGradient>
-      <filter id="f" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.25"/></filter>
-    </defs>
-    <rect width="100%" height="100%" rx="36" ry="36" fill="url(#${gradientId})" />
-    <rect x="0" y="60" width="${w}" height="120" fill="#000" opacity="0.9"/>
-    <rect x="60" y="${220}" width="${w-280}" height="120" rx="6" ry="6" fill="#fff" />
-    <text x="80" y="${285}" font-family="Arial, sans-serif" font-size="44" fill="#111">${sigSample}</text>
-    <rect x="${w-200}" y="${220}" width="120" height="80" rx="6" ry="6" fill="#eee" />
-    <text x="${w-140}" y="${275}" font-family="monospace" font-size="42" fill="#111" text-anchor="middle">${cvv}</text>
-    <text x="80" y="${380}" font-family="Arial" font-size="28" fill="#fff">${leftInfo}</text>
-    <g fill-opacity="0.06" fill="#000">
-      <rect x="0" y="${420}" width="${w}" height="8"/>
-      <rect x="0" y="${440}" width="${w}" height="6"/>
-      <rect x="0" y="${460}" width="${w}" height="4"/>
-    </g>
-    <g transform="translate(${w-260}, ${h-200})">
-      ${logoSVG(logoText)}
-    </g>
-    <text x="80" y="${h-30}" font-family="Arial" font-size="20" fill="#fff">${bankName}</text>
-    <rect x="2" y="2" width="${w-4}" height="${h-4}" rx="34" ry="34" fill="none" stroke="#000" stroke-opacity="0.06"/>
-  </svg>
-  `;
-}
-
-/* Format fiche complète (incluant banque/pays/brand/type) */
-function formatFullInfo(carte, binInfo){
-  const b = binInfo || {};
-  const bank = (b.bank && b.bank.name) || "Non spécifié";
-  const country = (b.country && b.country.name) || "Non spécifié";
-  const scheme = b.scheme || inferScheme(digitsOnly(carte.CardNumber));
-  const brand = b.brand || "Non spécifié";
-  const type = b.type || "Non spécifié";
-
-  return `--- FICHE COMPLÈTE ---
-Nom complet : ${carte.FullName || ''}
-Adresse     : ${carte.Address || ''}
-Ville       : ${carte.City || ''}
-Région      : ${carte.City2 || ''}
-Zip         : ${carte.Zip || ''}
-Téléphone   : ${carte.Phone || ''}
-Email       : ${carte.Email || ''}
+function formatFullInfo(carte,binInfo){
+const b=binInfo||{};
+return `Nom : ${carte.FullName}
+Adresse : ${carte.Address}, ${carte.City} (${carte.City2||''}) ${carte.Zip}
+Téléphone : ${carte.Phone}
+Email : ${carte.Email}
 
 Carte :
-Numéro      : ${formatCardNumber(carte.CardNumber)}
-BIN         : ${carte.BIN || ''}
-Expiration  : ${carte.ExpMonth || ''}/${carte.ExpYear || ''}
-CVV         : ${carte.CVV || ''}
-Réseau      : ${scheme}
-Banque      : ${bank}
-Pays        : ${country}
-Niveau      : ${brand}
-Type        : ${type}
-`;
+Numéro : ${groupCard(carte.CardNumber)}
+BIN : ${carte.BIN}
+Expiration : ${carte.ExpMonth}/${carte.ExpYear}
+CVV : ${carte.CVV}
+Réseau : ${b.card||inferScheme(carte.CardNumber)}
+Banque : ${b.bank||'Non spécifié'}
+Niveau : ${b.level||'Non spécifié'}
+Type : ${b.type||'Non spécifié'}
+Agence la plus proche : ${b.nearest_branch?b.nearest_branch.name+' ('+b.nearest_branch.distance+')':''}
+Adresse agence : ${b.nearest_branch?b.nearest_branch.address:''}`;
 }
 
-function formatCardNumber(n){ return digitsOnly(n).replace(/(\d{4})(?=\d)/g,'$1 '); }
-
-/* Create entry DOM: SVG image data URL + link + fiche complète text */
-function createCardEntry(carte, binInfo, scheme){
-  const svg = buildCardBackSVG(carte, scheme, binInfo);
-  const svgUri = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-
-  const wrap = document.createElement('div'); wrap.className='cardWrap';
-  const img = document.createElement('img'); img.className='cardImage'; img.src = svgUri; img.alt = 'Carte (verso)';
-  const link = document.createElement('a'); link.href = svgUri; link.target = '_blank'; link.className='linkImg';
-  link.textContent = 'Ouvrir l’image (verso) — clic droit pour enregistrer';
-  link.setAttribute('download', `card_${(carte.BIN||'unknown')}.svg`);
-
-  const info = document.createElement('div'); info.className='info'; info.textContent = formatFullInfo(carte, binInfo);
-
-  wrap.appendChild(img);
-  wrap.appendChild(link);
-  wrap.appendChild(info);
-  cardsGrid.appendChild(wrap);
+function createCardEntry(carte,binInfo){
+const wrap=document.createElement('div'); wrap.className='cardWrap';
+const link=document.createElement('a'); link.className='linkImg';
+link.href=buildCardPage(carte,binInfo);
+link.target='_blank';
+link.textContent='Ouvrir l’image de la carte (verso)';
+const info=document.createElement('div'); info.className='info';
+info.textContent=formatFullInfo(carte,binInfo);
+wrap.appendChild(link); wrap.appendChild(info);
+document.getElementById('cardsGrid').appendChild(wrap);
 }
 
-/* Infer scheme when no bin info */
-function inferScheme(digits){
-  if(/^3[47]/.test(digits)) return "AMEX";
-  if(/^4/.test(digits)) return "Visa";
-  if(/^5[1-5]/.test(digits)) return "MasterCard";
-  if(/^6(?:011|5|22)/.test(digits)) return "Discover";
-  if(/^35/.test(digits)) return "JCB";
-  return "default";
-}
-
-/* Main processing */
 async function processText(text){
-  cardsGrid.innerHTML = ''; logBox.textContent = ''; progressBar.style.width = '0%'; counter.textContent = '0/0'; status.textContent='';
-
-  const raw = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-  const lines = raw.filter(l=> l.includes('|'));
-  if(lines.length===0){ alert('Aucune fiche valide trouvée (attendu | séparateur).'); return; }
-  const total = lines.length; let done = 0;
-  counter.textContent = `${done}/${total}`;
-
-  const BATCH = 6;
-  for(let i=0; i<lines.length; i+=BATCH){
-    const batch = lines.slice(i, i+BATCH);
-    await Promise.all(batch.map(async (line, idx)=>{
-      const numIndex = i+idx+1;
-      const parts = line.split('|').map(p=>p.trim());
-      if(parts.length < 4){
-        appendLog(`⚠️ Fiche #${numIndex} incomplète — ignorée.`);
-        done++; counter.textContent = `${done}/${total}`; progressBar.style.width = `${Math.round((done/total)*100)}%`;
-        return;
-      }
-      while(parts.length < 12) parts.push('');
-      const carte = {
-        CardNumber: parts[0],
-        ExpMonth: parts[1],
-        ExpYear: parts[2],
-        CVV: parts[3],
-        BankField: parts[4],
-        FullName: parts[5],
-        Address: parts[6],
-        City: parts[7],
-        City2: parts[8],
-        Zip: parts[9],
-        Phone: parts[10],
-        Email: parts[11]
-      };
-      const digits = digitsOnly(carte.CardNumber);
-      if(digits.length < 13 || digits.length > 19){
-        appendLog(`⚠️ Fiche #${numIndex} : numéro invalide (longueur ${digits.length})`);
-        done++; counter.textContent = `${done}/${total}`; progressBar.style.width = `${Math.round((done/total)*100)}%`;
-        return;
-      }
-      carte.BIN = digits.slice(0,6);
-      const binInfo = pickBinInfo(carte.BIN) || null;
-      const scheme = (binInfo && binInfo.scheme) ? binInfo.scheme : inferScheme(digits);
-      appendLog(`Traitement #${numIndex} — BIN ${carte.BIN} — ${scheme}`);
-      createCardEntry(carte, binInfo, scheme);
-      done++; counter.textContent = `${done}/${total}`; progressBar.style.width = `${Math.round((done/total)*100)}%`;
-    }));
-    await new Promise(r => setTimeout(r, 60));
-  }
-  appendLog(`✅ Traitement terminé. ${total} fiches analysées.`);
-  status.textContent = 'Terminé';
+const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).filter(l=>l.includes('|'));
+document.getElementById('cardsGrid').innerHTML='';
+for(let i=0;i<lines.length;i++){
+const parts=lines[i].split('|').map(p=>p.trim());
+while(parts.length<12) parts.push('');
+const carte={
+CardNumber: parts[0],
+ExpMonth: parts[1],
+ExpYear: parts[2],
+CVV: parts[3],
+BankField: parts[4],
+FullName: parts[5],
+Address: parts[6],
+City: parts[7],
+City2: parts[8],
+Zip: parts[9],
+Phone: parts[10],
+Email: parts[11]
+};
+carte.BIN=digitsOnly(carte.CardNumber).slice(0,6);
+const binInfo=pickBinInfo(carte.BIN);
+createCardEntry(carte,binInfo);
 }
-
-/* Download aggregate: all fiches complètes */
-document.getElementById('download').addEventListener('click', ()=>{
-  const blocks = Array.from(cardsGrid.querySelectorAll('.info')).map(n=>n.textContent);
-  if(blocks.length===0){ alert('Rien à télécharger.'); return; }
-  const blob = new Blob([blocks.join('\n\n')], {type:'text/plain;charset=utf-8'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'lightri_full_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
-});
+}
 
 /* Events */
-document.getElementById('process').addEventListener('click', async ()=>{
-  const t = inputBox.value.trim();
-  if(t) await processText(t);
-  else if(fileInput.files.length>0){
-    const f = fileInput.files[0];
-    const txt = await f.text();
-    await processText(txt);
-  } else alert('Colle ton texte ou charge un fichier .txt');
+document.getElementById('process').addEventListener('click',()=>{ 
+const t=document.getElementById('input').value.trim();
+if(t) processText(t);
+else alert("Colle ton texte ou ajoute un fichier .txt");
 });
 
-document.getElementById('loadExample').addEventListener('click', ()=>{
-  inputBox.value = [
-    "5539791646892300 | 12 | 2025 | 257 | FRANCE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr",
-    "5133791059685621 | 02 | 2026 | 500 | FRANCE | Dicanot | 42 boulevard Dubreuil | BuressurYvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com",
-    "4970407109386230 | 01 | 2026 | 116 | FRANCE | Remi Vallette | 18 avenue linn | Savigny sur orge | Savigny sur orge | 91600 | 0684204360 | remi.vallette@gmail.com",
-    "5137707170853795 | 09 | 2026 | 246 | FRANCE | Auguste F Gosselin | 39 Place du Jeu de Paume | VILLEJUIF | Ile-de-France | 94800 | 443824-7792 | xmasmom4@yahoo.com"
-  ].join('\n');
+document.getElementById('loadExample').addEventListener('click',()=>{
+document.getElementById('input').value=`5539791646892300 | 12 | 2025 | 257 | FRANCE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr
+5133791059685621 | 02 | 2026 | 500 | FRANCE | Dicanot | 42 boulevard Dubreuil | BuressurYvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com
+4970407109386230 | 01 | 2026 | 116 | FRANCE | Remi Vallette | 18 avenue linn | Savigny sur orge | Savigny sur orge | 91600 | 0684204360 | remi.vallette@gmail.com
+5137707170853795 | 09 | 2026 | 246 | FRANCE | Auguste F Gosselin | 39 Place du Jeu de Paume | VILLEJUIF | Ile-de-France | 94800 | 443824-7792 | xmasmom4@yahoo.com`;
 });
 
-/* Optionnel : loader bins.json to override LOCAL_BINS (file input) */
-fileInput.addEventListener('change', async (e)=>{
-  const f = e.target.files[0];
-  if(!f) return;
-  if(f.name.toLowerCase().endsWith('.json')){
-    try{
-      const txt = await f.text();
-      const parsed = JSON.parse(txt);
-      // expect object with keys of length 6
-      if(parsed && typeof parsed === 'object'){
-        // simple replace: clear LOCAL_BINS then copy (we can't reassign const, so copy properties)
-        Object.keys(LOCAL_BINS).forEach(k=>delete LOCAL_BINS[k]);
-        Object.assign(LOCAL_BINS, parsed);
-        appendLog(`✅ bins.json chargé : ${Object.keys(parsed).length} entrées.`);
-      } else appendLog('⚠️ JSON bins invalide.');
-    }catch(err){
-      appendLog('⚠️ Erreur lecture JSON : ' + err.message);
-    }
-  } else {
-    // if txt, put contents into input
-    const text = await f.text();
-    inputBox.value = text;
-  }
+document.getElementById('download').addEventListener('click',()=>{
+const blocks=Array.from(document.querySelectorAll('.info')).map(e=>e.textContent);
+if(blocks.length===0){alert('Rien à télécharger'); return;}
+const blob=new Blob([blocks.join('\n\n')],{type:'text/plain'});
+const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lightri_full_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
+});
+
+document.getElementById('file').addEventListener('change',async(e)=>{
+if(e.target.files.length>0){
+const text=await e.target.files[0].text();
+document.getElementById('input').value=text;
+processText(text);
+}
 });
 </script>
 </body>
