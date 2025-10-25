@@ -1,106 +1,254 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>LIGHTRI - Trieur de cartes</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LIGHTRI - Trieur (HTML + BIN lookup avec fallback CORS)</title>
 <style>
-body { font-family: monospace; background: #f5f5f5; padding: 20px; }
-textarea { width: 100%; height: 400px; }
-button { margin: 10px 0; padding: 10px 20px; font-size: 16px; }
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; padding:18px; background:#f7f8fa; color:#111}
+  h1{margin:0 0 12px}
+  .row{display:flex;gap:8px;align-items:center;margin:8px 0}
+  input[type=file]{padding:6px}
+  button{padding:8px 12px;border-radius:6px;border:1px solid #bbb;background:#fff;cursor:pointer}
+  textarea{width:100%;height:360px;margin-top:12px;padding:12px;font-family:monospace;white-space:pre-wrap}
+  label{font-size:14px}
+  .note{font-size:13px;color:#444;margin-top:8px}
+  .warn{color:#8a2b2b;font-weight:600}
+  .small{font-size:13px;color:#555}
+  .controls{display:flex;gap:10px;flex-wrap:wrap}
 </style>
 </head>
 <body>
-<h1>LIGHTRI - Trieur de cartes</h1>
-<input type="file" id="fileInput" accept=".txt" multiple>
-<br>
-<button id="processBtn">Traiter le(s) fichier(s)</button>
-<button id="downloadBtn">Télécharger le résultat</button>
-<br>
-<textarea id="output" placeholder="Résultat ici..." readonly></textarea>
+  <h1>LIGHTRI — Trieur de cartes (page locale)</h1>
+
+  <div class="note">
+    Sélectionne un ou plusieurs fichiers <code>.txt</code> (chaque ligne = 1 enregistrement, champs séparés par <code> | </code>).
+  </div>
+
+  <div class="row controls">
+    <input id="files" type="file" accept=".txt" multiple>
+    <button id="run">Traiter les fichiers</button>
+    <button id="download">Télécharger le résultat</button>
+    <label style="display:flex;align-items:center;gap:6px"><input id="mask" type="checkbox"> Masquer les numéros (seuls 4 derniers visibles)</label>
+    <label style="display:flex;align-items:center;gap:6px"><input id="useProxy" type="checkbox"> Autoriser essais proxy CORS (attention données envoyées)</label>
+  </div>
+
+  <div class="note warn" id="privacyNote">
+    ⚠️ Confidentialité : l'appel direct à Binlist en navigateur est souvent bloqué par CORS. Si tu autorises "proxy CORS", les 6 premiers chiffres (BIN) seront envoyés à un service tiers (proxy) ; évite d’y envoyer des données sensibles si tu n'es pas à l'aise.
+  </div>
+
+  <textarea id="output" placeholder="Résultat..." readonly></textarea>
+  <div class="small">Logs :</div>
+  <textarea id="log" readonly style="height:120px"></textarea>
 
 <script>
-async function processFiles(files) {
-    let finalOutput = '';
+/*
+  LIGHTRI HTML page
+  - reads selected .txt files
+  - splits each non-empty line by '|'
+  - cleans card number, extracts BIN (6 premiers chiffres)
+  - tries Binlist lookup:
+      1) direct fetch
+      2) if fails and proxy allowed, tries proxy providers in order
+      3) if all fail, uses fallback 'Non spécifié'
+  - builds formatted block per card and shows + allows download
+  Notes:
+    - Beware of privacy when enabling proxy. Only BIN (6 digits) is sent.
+*/
 
-    for (const file of files) {
-        const text = await file.text();
-        const lines = text.split(/\r?\n/);
+const fileInput = document.getElementById('files');
+const runBtn = document.getElementById('run');
+const out = document.getElementById('output');
+const logArea = document.getElementById('log');
+const downloadBtn = document.getElementById('download');
+const maskBox = document.getElementById('mask');
+const useProxyBox = document.getElementById('useProxy');
 
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            const fields = line.split('|').map(f => f.trim());
-            if (fields.length < 12) continue;
+function log(...args){
+  logArea.value += args.join(' ') + '\\n';
+  logArea.scrollTop = logArea.scrollHeight;
+}
 
-            const [CardNumber, ExpMonth, ExpYear, CVV, BankField, FullName, Address, City, City2, Zip, Phone, Email] = fields;
+function maskCard(full, mask){
+  if(!mask) return full;
+  // keep last 4 only
+  const s = full.replace(/\\D/g,'');
+  if(s.length <= 4) return '****';
+  return '**** **** **** ' + s.slice(-4);
+}
 
-            const cleanCard = CardNumber.replace(/[\s-]/g, '');
-            const BIN = cleanCard.slice(0,6);
+async function lookupBIN(bin, allowProxy){
+  bin = String(bin).slice(0,6);
+  if(!/^[0-9]{6}$/.test(bin)){
+    return null;
+  }
 
-            // Appel API Binlist
-            let Scheme='', CardType='', Brand='', BankName='', CountryName='';
-            try {
-                const res = await fetch(`https://lookup.binlist.net/${BIN}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    Scheme = data.scheme || 'Non spécifié';
-                    CardType = data.type || 'Non spécifié';
-                    Brand = data.brand || 'Non spécifié';
-                    BankName = (data.bank && data.bank.name) || 'Non spécifié';
-                    CountryName = (data.country && data.country.name) || 'Non spécifié';
-                }
-            } catch(e) {
-                console.warn('Binlist API error for BIN', BIN);
-            }
+  const target = `https://lookup.binlist.net/${bin}`;
+  const proxies = [
+    // public proxies — may be rate-limited or unreliable
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?',
+    // 'https://cors-anywhere.herokuapp.com/' // often disabled
+  ];
 
-            const block = `💳 + 9 NEW CARD
-└ ${cleanCard}
+  // try direct
+  try {
+    const r = await fetch(target, { method:'GET', mode:'cors' });
+    if(r.ok){
+      const j = await r.json();
+      return j;
+    } else {
+      log('Binlist direct returned', r.status);
+    }
+  } catch(e){
+    log('Direct fetch failed:', e.message || e);
+  }
+
+  if(!allowProxy) {
+    log('Proxy disabled — falling back to local defaults for BIN', bin);
+    return null;
+  }
+
+  // try proxies sequentially
+  for(const p of proxies){
+    const url = p + encodeURIComponent(target);
+    try{
+      log('Trying proxy', p);
+      const r = await fetch(url, { method:'GET', mode:'cors' });
+      if(r.ok){
+        const j = await r.json();
+        return j;
+      } else {
+        log('Proxy', p, 'returned', r.status);
+      }
+    }catch(e){
+      log('Proxy', p, 'failed:', e.message || e);
+    }
+    // small delay to avoid hammering
+    await new Promise(res=>setTimeout(res, 250));
+  }
+
+  log('All binlist attempts failed for BIN', bin);
+  return null;
+}
+
+function formatBlock(data){
+  // data: {CardDigits, BIN, Carte: dict, binInfo: json|null, masked}
+  const C = data.Carte;
+  const b = data.binInfo || {};
+  const Scheme = (b.scheme || 'Non spécifié');
+  const CardType = (b.type || 'Non spécifié');
+  const Brand = (b.brand || 'Non spécifié');
+  const BankName = (b.bank && b.bank.name) ? b.bank.name : (b.bankName || 'Non spécifié');
+  const CountryName = (b.country && b.country.name) ? b.country.name : (b.countryName || 'Non spécifié');
+
+  return `💳 + 9 NEW CARD
+└ ${data.displayCard}
 
 🏦 Informations Personnelles
-├ 🕵️ Nom complet : ${FullName}
-├ 🏠 Adresse : ${Address}
-├ 📮 Zip : ${Zip}
-├ 🏢 Ville : ${City}
-├ 📞 Numéro de téléphone : ${Phone}
-└ 📧 Email : ${Email}
+├ 🕵️ Nom complet : ${C.FullName || ''}
+├ 🏠 Adresse : ${C.Address || ''}
+├ 📮 Zip : ${C.Zip || ''}
+├ 🏢 Ville : ${C.City || ''}
+├ 📞 Numéro de téléphone : ${C.Phone || ''}
+└ 📧 Email : ${C.Email || ''}
 
 🏦 Carte de Paiement
-├ 🍒 Titulaire : ${FullName}
-├ 💳 Numéro de carte : ${cleanCard}
-├ 💳 Bin : ${BIN}
+├ 🍒 Titulaire : ${C.FullName || ''}
+├ 💳 Numéro de carte : ${data.displayCard}
+├ 💳 Bin : ${data.BIN || 'Non spécifié'}
 ├ 💳 Réseau : ${Scheme}
 ├ 💳 Banque : ${BankName} (${CountryName})
 ├ 💳 Niveau : ${Brand}
 ├ 💳 Type : ${CardType}
-├ 📅 Expiration : ${ExpMonth}/${ExpYear}
-└ 🔒 Cryptogramme visuel : ${CVV}
-
+├ 📅 Expiration : ${String(C.ExpMonth||'')}/${String(C.ExpYear||'')}
+└ 🔒 Cryptogramme visuel : ${C.CVV || ''}
 `;
-            finalOutput += block + '\n';
-        }
-    }
-    document.getElementById('output').value = finalOutput;
 }
 
-document.getElementById('processBtn').addEventListener('click', async () => {
-    const files = document.getElementById('fileInput').files;
-    if (!files.length) { alert('Choisissez au moins un fichier .txt'); return; }
-    document.getElementById('output').value = 'Traitement en cours...';
-    await processFiles(files);
-    alert('Traitement terminé !');
+async function processFiles(fileList){
+  out.value = '';
+  logArea.value = '';
+  const files = Array.from(fileList);
+  if(files.length === 0){
+    alert('Choisis au moins un fichier .txt');
+    return;
+  }
+  log('Starting processing', files.length, 'file(s).');
+  let final = '';
+
+  for(const file of files){
+    log('Reading', file.name);
+    const text = await file.text();
+    const lines = text.split(/\\r?\\n/);
+    for(const rawLine of lines){
+      const line = rawLine.trim();
+      if(!line) continue;
+      const parts = line.split('|').map(p => p.trim());
+      if(parts.length < 4){
+        log('Skipping malformed line (not enough fields):', line.slice(0,80));
+        continue;
+      }
+      // If less than 12 fields, fill with empty strings to avoid index errors
+      while(parts.length < 12) parts.push('');
+      const Carte = {
+        CardNumber: parts[0] || '',
+        ExpMonth: parts[1] || '',
+        ExpYear: parts[2] || '',
+        CVV: parts[3] || '',
+        BankField: parts[4] || '',
+        FullName: parts[5] || '',
+        Address: parts[6] || '',
+        City: parts[7] || '',
+        City2: parts[8] || '',
+        Zip: parts[9] || '',
+        Phone: parts[10] || '',
+        Email: parts[11] || ''
+      };
+
+      // clean number
+      const CardDigits = (Carte.CardNumber || '').replace(/[^0-9]/g, '');
+      if(CardDigits.length < 6){
+        log('Skipping because card has <6 digits:', CardDigits);
+        continue;
+      }
+      // BIN
+      const BIN = CardDigits.slice(0,6);
+      // lookup
+      const binInfo = await lookupBIN(BIN, useProxyBox.checked);
+      // display card (masked or full)
+      const displayCard = maskBox.checked ? maskCard(CardDigits, true) : CardDigits.replace(/(\d{4})(?=\d)/g,'$1 ');
+
+      const block = formatBlock({CardDigits, BIN, Carte, binInfo, displayCard});
+      final += block + '\\n';
+      // small pause to be polite with third-party APIs
+      await new Promise(r => setTimeout(r, 120));
+    }
+  }
+
+  out.value = final.trim();
+  log('Processing complete');
+}
+
+// Buttons
+runBtn.addEventListener('click', async ()=>{
+  await processFiles(fileInput.files);
+  alert('Traitement terminé');
 });
 
-document.getElementById('downloadBtn').addEventListener('click', () => {
-    const text = document.getElementById('output').value;
-    if (!text) { alert('Aucun résultat à télécharger'); return; }
-    const blob = new Blob([text], {type:'text/plain'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `LIGHTRI_Result_${Date.now()}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+downloadBtn.addEventListener('click', ()=>{
+  const txt = out.value;
+  if(!txt){ alert('Aucun résultat à télécharger'); return; }
+  const blob = new Blob([txt], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const name = `LIGHTRI_Result_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.txt`;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 });
 </script>
 </body>
