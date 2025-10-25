@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LIGHTRI — Trieur sobre</title>
+<title>LIGHTRI — Trieur sobre (Hors ligne)</title>
 <style>
 body{
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
@@ -26,20 +26,26 @@ button:hover{background:#f2f2f2}
 #output{height:340px;white-space:pre-wrap}
 #log{height:140px;background:#fafafa;font-size:13px;overflow:auto}
 .note{font-size:13px;color:#444;margin-bottom:8px}
+.progress-container{width:100%;background:#eee;height:16px;border-radius:8px;margin-bottom:12px;overflow:hidden;}
+.progress-bar{height:16px;background:#4caf50;width:0%;transition:width 0.2s;}
 hr{margin:20px 0;border:0;border-top:1px solid #ccc}
 </style>
 </head>
 <body>
-<h1>💳 LIGHTRI — Trieur sobre</h1>
-<div class="note">Colle ton texte brut ci-dessous ou ajoute un fichier .txt.  
-Chaque fiche doit comporter des champs séparés par <code>|</code>.  
-Le script supprime les 8 premiers chiffres d’identifiant avant chaque fiche.</div>
+<h1>💳 LIGHTRI — Trieur sobre (Hors ligne)</h1>
+<div class="note">
+Colle ton texte brut ci-dessous ou ajoute un fichier .txt.<br/>
+Chaque fiche doit comporter des champs séparés par <code>|</code>.<br/>
+Le script supprime les 8 premiers chiffres d’identifiant avant chaque fiche.
+</div>
 
 <div class="controls">
   <input id="file" type="file" accept=".txt" />
   <button id="process">Traiter</button>
   <button id="download">Télécharger</button>
 </div>
+
+<div class="progress-container"><div class="progress-bar" id="progress"></div></div>
 
 <textarea id="input" placeholder="Colle ici ton texte brut..."></textarea>
 <hr/>
@@ -48,31 +54,33 @@ Le script supprime les 8 premiers chiffres d’identifiant avant chaque fiche.</
 <textarea id="log" readonly></textarea>
 
 <script>
-const API_BASE = "https://celebrated-strudel-1c13f6.netlify.app/.netlify/functions/binlookup?bin=";
+// --- Base BIN locale exemple ---
+const LOCAL_BINS = {
+  "400000": {scheme:"Visa",brand:"Classic",type:"Debit",bank:{name:"Bank A"},country:{name:"USA"}},
+  "510000": {scheme:"MasterCard",brand:"Gold",type:"Credit",bank:{name:"Bank B"},country:{name:"France"}},
+  "340000": {scheme:"AMEX",brand:"Platinum",type:"Credit",bank:{name:"Bank C"},country:{name:"UK"}}
+};
+
 const logBox = document.getElementById("log");
 const inputBox = document.getElementById("input");
 const outputBox = document.getElementById("output");
 const fileInput = document.getElementById("file");
+const progressBar = document.getElementById("progress");
 
-function log(msg){ logBox.value += msg + "\\n"; logBox.scrollTop = logBox.scrollHeight; }
+function log(msg){
+  logBox.value += msg + "\n"; 
+  logBox.scrollTop = logBox.scrollHeight; 
+}
 
-async function fetchBin(bin){
-  try{
-    const r = await fetch(API_BASE + encodeURIComponent(bin));
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    return await r.json();
-  }catch(e){
-    log("⚠️ BIN "+bin+" : "+e.message);
-    return null;
-  }
+function fetchBinLocal(bin){
+  return LOCAL_BINS[bin] || null;
 }
 
 function parseLines(text){
-  const rawLines = text.split(/\\r?\\n/).map(l=>l.trim()).filter(Boolean);
+  const rawLines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   const result = [];
   for(const line of rawLines){
-    // enlever les 8 premiers chiffres d'identifiant s'ils existent
-    const cleaned = line.replace(/^\\d{8,}\\s*/, "");
+    const cleaned = line.replace(/^\d{8,}\s*/, "");
     if(!cleaned.includes("|")){
       log("⚠️ Ignoré : ligne sans séparateurs -> "+cleaned);
       continue;
@@ -83,7 +91,7 @@ function parseLines(text){
 }
 
 function groupCard(num){
-  return num.replace(/\\D/g,"").replace(/(\\d{4})(?=\\d)/g,"$1 ");
+  return num.replace(/\D/g,"").replace(/(\d{4})(?=\d)/g,"$1 ");
 }
 
 function formatBlock(carte, binInfo){
@@ -120,8 +128,11 @@ function formatBlock(carte, binInfo){
 
 async function processText(text){
   logBox.value = ""; outputBox.value = "";
+  progressBar.style.width = "0%";
+
   const lines = parseLines(text);
   if(lines.length===0){ alert("Aucune fiche valide trouvée."); return; }
+
   let finalOut = "";
   let i=0;
   for(const line of lines){
@@ -134,14 +145,17 @@ async function processText(text){
       BankField:parts[4],FullName:parts[5],Address:parts[6],
       City:parts[7],City2:parts[8],Zip:parts[9],Phone:parts[10],Email:parts[11]
     };
-    const digits = carte.CardNumber.replace(/\\D/g,"");
+    const digits = carte.CardNumber.replace(/\D/g,"");
     if(digits.length<6){ log("⚠️ Fiche #"+i+" carte trop courte."); continue; }
     carte.BIN = digits.slice(0,6);
     log("Traitement fiche #"+i+" (BIN "+carte.BIN+")...");
-    const binInfo = await fetchBin(carte.BIN);
-    finalOut += formatBlock(carte,binInfo) + "\\n";
-    await new Promise(r=>setTimeout(r,150));
+    const binInfo = fetchBinLocal(carte.BIN);
+    finalOut += formatBlock(carte,binInfo) + "\n";
+
+    progressBar.style.width = `${Math.round((i/lines.length)*100)}%`;
+    await new Promise(r=>setTimeout(r,50));
   }
+
   outputBox.value = finalOut.trim();
   log("✅ Traitement terminé. "+lines.length+" fiches analysées.");
 }
