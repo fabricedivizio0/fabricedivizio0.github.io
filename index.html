@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LIGHTRI — Trieur sobre (Hors ligne, 600 BIN)</title>
+<title>LIGHTRI — Trieur sobre (Hors ligne + cartes visuelles)</title>
 <style>
   :root{--bg:#f8f9fb;--fg:#111;--muted:#666;--card:#fff;--accent:#4caf50}
   @media (prefers-color-scheme:dark){
@@ -14,7 +14,7 @@
     background:var(--bg);color:var(--fg);margin:0;padding:20px;
   }
   h1{margin:0 0 8px 0;font-weight:600}
-  textarea,input,button,select{font-family:inherit;font-size:15px}
+  textarea,input,button{font-family:inherit;font-size:15px}
   textarea{width:100%;height:220px;padding:10px;border:1px solid #ccc;border-radius:8px;resize:vertical;margin-top:8px;background:var(--card);color:var(--fg)}
   button{background:#fff;border:1px solid #999;border-radius:8px;padding:8px 14px;cursor:pointer;margin-top:8px}
   button:hover{background:#f2f2f2}
@@ -22,59 +22,50 @@
   .progress-container{width:100%;background:#eee;height:16px;border-radius:8px;margin:8px 0 12px 0;overflow:hidden}
   .progress-bar{height:16px;background:var(--accent);width:0%;transition:width 0.18s linear}
   .status-line{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--muted);margin-bottom:6px}
-  #output{height:320px;white-space:pre-wrap;background:var(--card);color:var(--fg);padding:10px;border-radius:8px;border:1px solid #ccc}
-  #log{height:120px;background:#fafafa;font-size:13px;overflow:auto;padding:8px;border-radius:8px;border:1px solid #e6e6e6}
+  #output{height:200px;white-space:pre-wrap;background:var(--card);color:var(--fg);padding:10px;border-radius:8px;border:1px solid #ccc;margin-bottom:16px}
+  #log{height:120px;background:#fafafa;font-size:13px;overflow:auto;padding:8px;border-radius:8px;border:1px solid #e6e6e6;margin-bottom:16px}
   .note{font-size:13px;color:var(--muted);margin-bottom:8px}
   hr{margin:18px 0;border:0;border-top:1px solid #ccc}
-  .small{font-size:13px;color:var(--muted)}
+  #cardsContainer{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
+  .card-visual{
+    width:300px;height:180px;border-radius:16px;padding:16px;position:relative;color:#fff;
+    display:flex;flex-direction:column;justify-content:space-between;font-family:monospace;
+    box-shadow:0 4px 10px rgba(0,0,0,0.3);
+  }
 </style>
 </head>
 <body>
-  <h1>💳 LIGHTRI — Trieur sobre (Hors ligne)</h1>
-  <div class="note">
-    Colle ton texte brut ci-dessous ou ajoute un fichier <code>.txt</code>.<br>
-    Chaque fiche doit comporter des champs séparés par <code>|</code>.  
-    Le script **ne supprime plus** d'octets et prend en charge les numéros de carte >= 13 chiffres.
-  </div>
+<h1>💳 LIGHTRI — Trieur sobre (Hors ligne + cartes visuelles)</h1>
+<div class="note">
+Colle ton texte brut ci-dessous ou ajoute un fichier <code>.txt</code>.<br>
+Chaque fiche doit comporter des champs séparés par <code>|</code>.
+</div>
 
-  <div class="controls">
-    <input id="file" type="file" accept=".txt" />
-    <button id="process">Traiter</button>
-    <button id="download">Télécharger</button>
-    <button id="loadExample">Charger exemple</button>
-  </div>
+<div class="controls">
+  <input id="file" type="file" accept=".txt,.json" />
+  <button id="process">Traiter</button>
+  <button id="download">Télécharger</button>
+  <button id="loadExample">Charger exemple</button>
+</div>
 
-  <div class="status-line">
-    <div class="small">Progrès</div>
-    <div class="small" id="counter">0 fiches traitées sur 0</div>
-  </div>
-  <div class="progress-container"><div class="progress-bar" id="progress"></div></div>
+<div class="status-line">
+  <div class="small">Progrès</div>
+  <div class="small" id="counter">0 fiches traitées sur 0</div>
+</div>
+<div class="progress-container"><div class="progress-bar" id="progress"></div></div>
 
-  <textarea id="input" placeholder="Colle ici ton texte brut..."></textarea>
-  <hr/>
-  <textarea id="output" placeholder="Résultat..." readonly></textarea>
-  <div class="note">Logs / erreurs :</div>
-  <div id="log" aria-live="polite"></div>
+<textarea id="input" placeholder="Colle ici ton texte brut..."></textarea>
+<hr/>
+<textarea id="output" placeholder="Résultat..." readonly></textarea>
+<div class="note">Logs / erreurs :</div>
+<div id="log" aria-live="polite"></div>
+
+<div id="cardsContainer"></div>
 
 <script>
-/*
-  LIGHTRI - version hors ligne corrigée
-  - Plus de suppression des 8 premiers chiffres.
-  - Acceptation des numéros >=13 chiffres (common lengths 13-19).
-  - Processus asynchrone par petits lots.
-  - Intègre 600 BIN locaux générés de manière déterministe (modifiable).
-  - Option: charger un bins.json externe si tu as un fichier réel.
-*/
-
-/* ---------------------------
-   Génération LOCAL_BINS (600 entrées)
-   - Pour garder le fichier compact, on génère les BINs en JS
-   - Chaque BIN est une clé 6-chiffres mappée vers un objet
-   - Si tu veux remplacer par de "vrais" BINs, remplace LOCAL_BINS par ton JSON
-   --------------------------- */
+// --- LOCAL_BINS généré (600+) ---
 const LOCAL_BINS = (function genBins(){
   const bins = {};
-  // Common starts: 40xxxx (Visa), 41xxxx, 42xxxx, 51xxxx (MC), 52xxxx, 53xxxx, 54xxxx, 55xxxx, 34xxxx(AMEX), 37xxxx
   const prefixes = [
     {start:400000,count:80,scheme:"Visa"},
     {start:410000,count:60,scheme:"Visa"},
@@ -106,23 +97,19 @@ const LOCAL_BINS = (function genBins(){
         bank: { name: `Banque ${String(bankIdx).padStart(3,"0")}` },
         country: { name: ["France","USA","UK","Germany","Spain","Italy","Netherlands","Canada","Brazil","Australia"][bankIdx % 10] }
       };
-      bankIdx++;
-      if(bankIdx>999) bankIdx=1;
+      bankIdx++; if(bankIdx>999) bankIdx=1;
     }
   });
-  // ensure we have at least 600 entries (we created ~600 from above)
   return bins;
 })();
 
-/* ---------------------------
-   UI references
-   --------------------------- */
 const logBox = document.getElementById("log");
 const inputBox = document.getElementById("input");
 const outputBox = document.getElementById("output");
 const fileInput = document.getElementById("file");
 const progressBar = document.getElementById("progress");
 const counterEl = document.getElementById("counter");
+const cardsContainer = document.getElementById("cardsContainer");
 
 function appendLog(msg){
   const time = new Date().toLocaleTimeString();
@@ -130,19 +117,8 @@ function appendLog(msg){
   logBox.scrollTop = logBox.scrollHeight;
 }
 
-/* ---------------------------
-   Utilitaires
-   --------------------------- */
-function groupCard(num){
-  return num.replace(/\D/g,"").replace(/(\d{4})(?=\d)/g,"$1 ");
-}
+function groupCard(num){ return num.replace(/\D/g,"").replace(/(\d{4})(?=\d)/g,"$1 "); }
 
-/*
-  parseLines:
-  - conserve la ligne telle quelle sauf suppression d'espace debut/fin
-  - exige la présence du séparateur '|' pour être considérée fiche
-  - NE SUPPRIME PAS d'octets au début (fix du bug)
-*/
 function parseLines(text){
   const rawLines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   const result = [];
@@ -156,10 +132,7 @@ function parseLines(text){
   return result;
 }
 
-function getBinInfo(bin){
-  // bin = 6 premiers chiffres string
-  return LOCAL_BINS[bin] || null;
-}
+function getBinInfo(bin){ return LOCAL_BINS[bin] || null; }
 
 function formatBlock(carte, binInfo){
   const b = binInfo || {};
@@ -193,110 +166,66 @@ function formatBlock(carte, binInfo){
 `;
 }
 
-/* ---------------------------
-   Traitement principal (asynchrone, lots)
-   - accepte num >= 13 chiffres (mais pas < 10)
-   - montre compteur "X sur Y"
-   --------------------------- */
+function createCardVisual(carte){
+  const binInfo = getBinInfo(carte.BIN);
+  const cardDiv = document.createElement("div");
+  cardDiv.className = "card-visual";
+  cardDiv.style.background = `linear-gradient(135deg, ${binInfo?.scheme==="Visa"?"#4caf50":"#2196f3"},${binInfo?.scheme==="MasterCard"?"#ff9800":"#9c27b0"})`;
+
+  const numEl = document.createElement("div"); numEl.innerText = groupCard(carte.CardNumber); numEl.style.fontSize="18px"; numEl.style.letterSpacing="2px";
+  const nameEl = document.createElement("div"); nameEl.innerText = carte.FullName.toUpperCase(); nameEl.style.fontSize="14px"; nameEl.style.marginTop="8px";
+  const expEl = document.createElement("div"); expEl.innerText="EXP: "+carte.ExpMonth+"/"+carte.ExpYear; expEl.style.position="absolute"; expEl.style.bottom="16px"; expEl.style.right="16px"; expEl.style.fontSize="12px";
+
+  cardDiv.appendChild(numEl); cardDiv.appendChild(nameEl); cardDiv.appendChild(expEl);
+  cardsContainer.appendChild(cardDiv);
+}
+
 async function processText(text){
-  // reset UI
-  outputBox.value = "";
-  logBox.innerText = "";
-  progressBar.style.width = "0%";
-  counterEl.innerText = "0 fiches traitées sur 0";
+  outputBox.value=""; logBox.innerText=""; cardsContainer.innerHTML="";
+  progressBar.style.width="0%"; counterEl.innerText="0 fiches traitées sur 0";
 
-  const lines = parseLines(text);
-  if(lines.length===0){ alert("Aucune fiche valide trouvée."); return; }
+  const lines=parseLines(text); if(lines.length===0){ alert("Aucune fiche valide trouvée."); return; }
+  const total = lines.length; let processed=0; let finalOut="";
 
-  const total = lines.length;
-  let processed = 0;
-  let finalOut = "";
-
-  const BATCH = 8; // petit lot pour rester réactif
+  const BATCH=8;
   for(let start=0; start<lines.length; start+=BATCH){
-    const batch = lines.slice(start, start+BATCH);
-    // traiter les fiches du lot en parallèle-ish (mais on construit séquentiellement pour l'output)
-    await Promise.all(batch.map(async (line, idx)=>{
-      const i = start + idx + 1;
+    const batch = lines.slice(start,start+BATCH);
+    await Promise.all(batch.map(async (line,idx)=>{
+      const i=start+idx+1;
       const parts = line.split("|").map(p=>p.trim());
-      if(parts.length < 4){
-        appendLog(`⚠️ Fiche #${i} incomplète : ${line.slice(0,80)}`);
-        processed++;
-        counterEl.innerText = `${processed} fiches traitées sur ${total}`;
-        progressBar.style.width = `${Math.round((processed/total)*100)}%`;
-        return;
-      }
-      while(parts.length < 12) parts.push("");
-      const carte = {
-        CardNumber: parts[0],
-        ExpMonth: parts[1],
-        ExpYear: parts[2],
-        CVV: parts[3],
-        BankField: parts[4],
-        FullName: parts[5],
-        Address: parts[6],
-        City: parts[7],
-        City2: parts[8],
-        Zip: parts[9],
-        Phone: parts[10],
-        Email: parts[11]
+      if(parts.length<4){ appendLog(`⚠️ Fiche #${i} incomplète`); processed++; return; }
+      while(parts.length<12) parts.push("");
+      const carte={
+        CardNumber: parts[0], ExpMonth: parts[1], ExpYear: parts[2], CVV: parts[3],
+        BankField: parts[4], FullName: parts[5], Address: parts[6],
+        City: parts[7], City2: parts[8], Zip: parts[9], Phone: parts[10], Email: parts[11]
       };
-      const digits = carte.CardNumber.replace(/\D/g,"");
-      // accept card numbers length 13..19 (typical)
-      if(digits.length < 13 || digits.length > 19){
-        appendLog(`⚠️ Fiche #${i} : numéro invalide (longueur ${digits.length}) -> ${carte.CardNumber}`);
-        processed++;
-        counterEl.innerText = `${processed} fiches traitées sur ${total}`;
-        progressBar.style.width = `${Math.round((processed/total)*100)}%`;
-        return;
-      }
-      carte.BIN = digits.slice(0,6);
+      const digits=carte.CardNumber.replace(/\D/g,"");
+      if(digits.length<13 || digits.length>19){ appendLog(`⚠️ Fiche #${i} : numéro invalide`); processed++; return; }
+      carte.BIN=digits.slice(0,6);
       appendLog(`Traitement fiche #${i} (BIN ${carte.BIN})`);
-      const binInfo = getBinInfo(carte.BIN);
-      // construire sortie (séquentielle)
-      finalOut += formatBlock(carte, binInfo) + "\n";
-      processed++;
-      counterEl.innerText = `${processed} fiches traitées sur ${total}`;
-      progressBar.style.width = `${Math.round((processed/total)*100)}%`;
+      finalOut+=formatBlock(carte,getBinInfo(carte.BIN))+"\n";
+      createCardVisual(carte);
+      processed++; counterEl.innerText=`${processed} fiches traitées sur ${total}`;
+      progressBar.style.width=`${Math.round((processed/total)*100)}%`;
     }));
-    // petite pause pour garder l'UI réactive
-    await new Promise(r => setTimeout(r, 80));
+    await new Promise(r=>setTimeout(r,50));
   }
 
-  outputBox.value = finalOut.trim();
+  outputBox.value=finalOut.trim();
   appendLog(`✅ Traitement terminé. ${total} fiches analysées.`);
 }
 
-/* ---------------------------
-   Evenements UI
-   --------------------------- */
-document.getElementById("process").addEventListener("click", async()=>{
-  const txt = inputBox.value.trim();
-  if(txt) await processText(txt);
-  else if(fileInput.files.length > 0){
-    const file = fileInput.files[0];
-    const text = await file.text();
-    await processText(text);
-  } else {
-    alert("Colle ton texte ou ajoute un fichier .txt.");
-  }
+document.getElementById("process").addEventListener("click",async()=>{const txt=inputBox.value.trim(); if(txt) await processText(txt); else if(fileInput.files.length>0){ const f=fileInput.files[0]; const text=await f.text(); await processText(text);}else alert("Colle ton texte ou ajoute un fichier .txt.");});
+
+document.getElementById("download").addEventListener("click",()=>{
+  if(!outputBox.value){ alert("Rien à télécharger."); return; }
+  const blob=new Blob([outputBox.value],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="LIGHTRI_result.txt"; document.body.appendChild(a); a.click(); a.remove();
 });
 
-document.getElementById("download").addEventListener("click", ()=>{
-  const t = outputBox.value;
-  if(!t){ alert("Rien à télécharger."); return; }
-  const blob = new Blob([t], {type: "text/plain;charset=utf-8"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "LIGHTRI_result.txt";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-});
-
-document.getElementById("loadExample").addEventListener("click", ()=>{
-  // tes exemples fournis, mis dans l'éditeur pour test rapide
-  inputBox.value = [
+document.getElementById("loadExample").addEventListener("click",()=>{
+  inputBox.value=[
     "5539791646892300 | 12 | 2025 | 257 | FRANCE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr",
     "5133791059685621 | 02 | 2026 | 500 | FRANCE | Dicanot | 42boulevardDubreuil | BuressurYvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com",
     "4970407109386230 | 01 | 2026 | 116 | FRANCE | Remi Vallette | 18 avenue linn | Savigny sur orge | Savigny sur orge | 91600 | 0684204360 | remi.vallette@gmail.com",
@@ -304,36 +233,6 @@ document.getElementById("loadExample").addEventListener("click", ()=>{
   ].join("\n");
 });
 
-/* ---------------------------
-   Optionnel : loader bins.json si tu veux remplacer LOCAL_BINS par un vrai fichier local (drag & drop)
-   Exemple d'utilisation : faire glisser un fichier JSON nommé bins.json contenant { "400000": {...}, ... }
-   --------------------------- */
-fileInput.addEventListener("change", async (e)=>{
-  const f = e.target.files[0];
-  if(!f) return;
-  if(f.name.toLowerCase().endsWith(".json")){
-    try{
-      const txt = await f.text();
-      const parsed = JSON.parse(txt);
-      // validation basique : objet avec clefs 6-chiffres
-      const keys = Object.keys(parsed||{});
-      if(keys.length>0 && keys[0].length===6){
-        // remplacer LOCAL_BINS (attention: variable hors scope, but we can copy props)
-        for(const k of Object.keys(LOCAL_BINS)) delete LOCAL_BINS[k];
-        Object.assign(LOCAL_BINS, parsed);
-        appendLog(`✅ bins.json chargé : ${keys.length} entrées intégrées localement.`);
-      } else {
-        appendLog("⚠️ Fichier JSON non valide pour BINs (attendu clefs 6-chiffres).");
-      }
-    }catch(err){
-      appendLog("⚠️ Erreur lecture JSON : " + err.message);
-    }
-  } else {
-    // si c'est txt: traiter comme fiches
-    const text = await f.text();
-    inputBox.value = text;
-  }
-});
 </script>
 </body>
 </html>
