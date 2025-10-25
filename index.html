@@ -3,49 +3,46 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LIGHTRI — Fiches sécurisées + Visuel (masqué)</title>
+<title>LIGHTRI — Fiches sobres + Logs erreurs</title>
 <style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#f8f9fb;color:#111;margin:0;padding:20px}
-  h1{margin:0 0 8px 0;font-weight:600}
-  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  textarea,input,button{font-family:inherit;font-size:15px}
-  textarea{width:100%;height:200px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;background:#fff;color:#111}
-  button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;cursor:pointer}
-  .note{font-size:13px;color:#666;margin-bottom:8px}
-  .progress{height:12px;background:#eee;border-radius:8px;overflow:hidden;margin:8px 0}
-  .progress>.bar{height:12px;background:#4caf50;width:0%;transition:width .18s linear}
-  #cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(720px,1fr));gap:12px;margin-top:16px}
-  .cardWrap{background:#fff;border-radius:10px;padding:12px;border:1px solid #e6e6e6;display:flex;flex-direction:column;gap:8px}
-  .cardText{white-space:pre-wrap;font-family:inherit;font-size:14px;color:#111;line-height:1.35}
-  .cardLink{color:#0b66ff;text-decoration:none;font-weight:600}
-  #errorLog{height:120px;background:#fff0f0;border:1px solid #f99;padding:8px;overflow:auto;font-size:13px;color:#900;white-space:pre-wrap;margin-top:12px;border-radius:6px;}
-  .small{font-size:13px;color:#666}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#f8f9fb;color:#111;margin:0;padding:20px}
+h1{margin:0 0 8px 0;font-weight:600}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+textarea,input,button{font-family:inherit;font-size:15px}
+textarea{width:100%;height:200px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;background:#fff;color:#111}
+button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;cursor:pointer}
+.note{font-size:13px;color:#666;margin-bottom:8px}
+.progress{height:12px;background:#eee;border-radius:8px;overflow:hidden;margin:8px 0}
+.progress>.bar{height:12px;background:#4caf50;width:0%;transition:width .18s linear}
+#cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(720px,1fr));gap:12px;margin-top:16px}
+.cardWrap{background:#fff;border-radius:10px;padding:12px;border:1px solid #e6e6e6;display:flex;flex-direction:column;gap:8px}
+.cardText{white-space:pre-wrap;font-family:inherit;font-size:14px;color:#111;line-height:1.35}
+#errorLog{height:120px;background:#fff0f0;border:1px solid #f99;padding:8px;overflow:auto;font-size:13px;color:#900;white-space:pre-wrap;margin-top:12px;border-radius:6px;}
+.small{font-size:13px;color:#666}
 </style>
 </head>
 <body>
-  <h1>💳 LIGHTRI — Fiches (sécurisé) + Visuel</h1>
-  <div class="note">Colle ton texte ou charge un .txt. Format par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code></div>
+<h1>💳 LIGHTRI — Fiches sobre</h1>
+<div class="note">Colle ton texte ou charge un fichier .txt. Format par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code></div>
 
-  <div class="controls">
-    <input id="file" type="file" accept=".txt,.json" />
-    <button id="process">Traiter</button>
-    <button id="download">Télécharger fiches</button>
-    <button id="loadExample">Charger exemple</button>
-  </div>
+<div class="controls">
+  <input id="file" type="file" accept=".txt,.json" />
+  <button id="process">Traiter</button>
+  <button id="download">Télécharger fiches</button>
+</div>
 
-  <div class="small">Progrès <span id="counter">0/0</span> — <span id="status">Prêt</span></div>
-  <div class="progress"><div class="bar" id="progressBar"></div></div>
+<div class="small">Progrès <span id="counter">0/0</span> — <span id="status">Prêt</span></div>
+<div class="progress"><div class="bar" id="progressBar"></div></div>
 
-  <textarea id="input" placeholder="Colle ici ton texte brut..."></textarea>
+<textarea id="input" placeholder="Colle ici ton texte brut..."></textarea>
 
-  <div id="cardsGrid"></div>
+<div id="cardsGrid"></div>
 
-  <div class="note">Erreurs (seulement) :</div>
-  <div id="errorLog"></div>
+<div class="note">Erreurs :</div>
+<div id="errorLog"></div>
 
 <script>
-/* Configuration */
-const BINLIST_BASE = 'https://lookup.binlist.net/'; // gratuit, sans clé (quota public)
+const BINLIST_BASE = 'https://lookup.binlist.net/';
 const inputBox = document.getElementById('input');
 const fileInput = document.getElementById('file');
 const cardsGrid = document.getElementById('cardsGrid');
@@ -55,269 +52,115 @@ const statusEl = document.getElementById('status');
 const errorLog = document.getElementById('errorLog');
 
 function setStatus(s){ statusEl.textContent = s; }
-function updateProgress(done,total){ counterEl.textContent = `${done}/${total}`; progressBar.style.width = total ? Math.round((done/total)*100) + '%' : '0%'; }
+function updateProgress(done,total){ counterEl.textContent = `${done}/${total}`; progressBar.style.width = total? (done/total*100)+'%':'0%'; }
 function digitsOnly(s){ return (s||'').toString().replace(/\D/g,''); }
-function groupCardMasked(num){
-  // return masked number, showing only last 4
-  const d = digitsOnly(num);
-  if(d.length <= 4) return d;
-  const last4 = d.slice(-4);
-  return '•••• •••• •••• ' + last4;
-}
-function groupCardVisual(num){ // display grouped (full digits ideally avoided)
-  return digitsOnly(num).replace(/(\d{4})(?=\d)/g,'$1 ');
-}
-function logError(msg){ errorLog.textContent += msg + '\\n'; errorLog.scrollTop = errorLog.scrollHeight; }
+function groupCard(num){ return digitsOnly(num).replace(/(\d{4})(?=\d)/g,'$1 '); }
+function logError(msg){ errorLog.textContent += msg + "\n"; errorLog.scrollTop = errorLog.scrollHeight; }
 
-/* fetch BIN info from binlist (fallback safe) */
 async function fetchBinInfo(bin){
   try{
     const res = await fetch(BINLIST_BASE + encodeURIComponent(bin), { headers: { 'Accept-Version':'3' }});
-    if(!res.ok) throw new Error('HTTP ' + res.status);
+    if(!res.ok) throw new Error('HTTP '+res.status);
     const j = await res.json();
     return {
-      bankName: j.bank?.name || j.bank || '',
-      brand: j.brand || j.scheme || '',
-      type: (j.type || '').toUpperCase() || '',
-      countryAlpha2: j.country?.alpha2 || '',
+      bankName: j.bank?.name || j.bank || 'Non spécifié',
+      brand: j.brand || j.scheme || 'CLASSIC',
+      type: (j.type || '').toUpperCase() || 'CREDIT',
+      country: j.country?.name || ''
     };
   }catch(e){
     logError('Erreur BIN '+bin+' : '+ e.message);
-    return { bankName:'', brand:'', type:'', countryAlpha2:'' };
+    return { bankName:'Non spécifié', brand:'CLASSIC', type:'CREDIT', country:'' };
   }
 }
 
-/* Build fiche text; note: we DO NOT include full PAN or full CVV in the visuel */
 function buildFicheText(carte, binInfo){
-  const bank = binInfo.bankName || carte.BankField || 'Non spécifié';
-  const brand = (binInfo.brand || 'CLASSIC').toString();
-  const type = (binInfo.type || 'CREDIT').toString();
-
   const lines = [];
-  lines.push('💳 +1 IMPO.UHQ 🇵🇸 ' + (binInfo.countryAlpha2 ? ' ' + countryCodeToEmoji(binInfo.countryAlpha2) : ''));
-  lines.push('└ ' + groupCardVisual(carte.CardNumber)); // grouped display (non-sensitive only in the main text — but you asked to keep original display; caution)
+  lines.push('💳 +1 IMPO.UHQ');
+  lines.push('└ '+groupCard(carte.CardNumber));
   lines.push('');
   lines.push('🏦 Informations Personnelles');
-  lines.push('├ 🕵️ Nom complet : ' + (carte.FullName || ''));
-  lines.push('├ 🏠 Adresse : ' + (carte.Address || ''));
-  lines.push('├ 📮 Zip : ' + (carte.Zip || ''));
-  lines.push('├ 🏢 Ville : ' + (carte.City || ''));
-  lines.push('├ 📞 Numéro de téléphone : ' + (carte.Phone || ''));
-  lines.push('└ 📧 Email : ' + (carte.Email || 'Non fourni'));
+  lines.push('├ 🕵️ Nom complet : '+(carte.FullName||''));
+  lines.push('├ 🏠 Adresse : '+(carte.Address||''));
+  lines.push('├ 📮 Zip : '+(carte.Zip||''));
+  lines.push('├ 🏢 Ville : '+(carte.City||''));
+  lines.push('├ 📞 Numéro de téléphone : '+(carte.Phone||''));
+  lines.push('└ 📧 Email : '+(carte.Email||'Non fourni'));
   lines.push('');
   lines.push('🏦 Carte de Paiement');
-  lines.push('├ 🍒 Titulaire : ' + (carte.FullName || ''));
-  lines.push('├ 💳 Numéro de carte : ' + groupCardMasked(carte.CardNumber)); // masked on fiche
-  lines.push('├ 💳 Bin : ' + (carte.BIN || ''));
-  lines.push('├ 💳 Banque : ' + bank);
-  lines.push('├ 💳 Niveau : ' + brand.toUpperCase());
-  lines.push('├ 💳 Type : ' + type.toUpperCase());
-  lines.push('├ 🎨 Visuel : (lien ci-dessous — page avec visuel MASQUÉ)');
-  lines.push('├ 📅 Expiration : ' + (carte.ExpMonth || '') + '/' + (carte.ExpYear || ''));
-  // CVV: not shown fully; show masked like "*16" or "***"
-  lines.push('└ 🔒 Cryptogramme visuel : ' + maskCvv(carte.CVV));
-  return lines.join('\\n');
+  lines.push('├ 🍒 Titulaire : '+(carte.FullName||''));
+  lines.push('├ 💳 Numéro de carte : '+groupCard(carte.CardNumber));
+  lines.push('├ 💳 Bin : '+(carte.BIN||''));
+  lines.push('├ 💳 Banque : '+binInfo.bankName);
+  lines.push('├ 💳 Niveau : '+binInfo.brand.toUpperCase());
+  lines.push('├ 💳 Type : '+binInfo.type.toUpperCase());
+  lines.push('├ 📅 Expiration : '+(carte.ExpMonth||'')+'/'+(carte.ExpYear||''));
+  lines.push('└ 🔒 Cryptogramme visuel : '+(carte.CVV||''));
+  return lines.join("\n");
 }
 
-/* small helpers */
-function countryCodeToEmoji(cc){
-  if(!cc) return '';
-  cc = cc.toUpperCase();
-  if(cc.length !== 2) return '';
-  const A = 0x1F1E6;
-  return String.fromCodePoint(A + cc.charCodeAt(0) - 65, A + cc.charCodeAt(1) - 65);
-}
-function maskCvv(cvv){
-  if(!cvv) return '';
-  const s = cvv.toString();
-  if(s.length<=1) return '*';
-  if(s.length===2) return '*' + s.slice(-1);
-  return '***'; // never reveal
-}
-
-/* Build a highly realistic-looking card SVG but with masked PAN and masked CVV.
-   This function returns an HTML string for a full page that will be opened in a new tab.
-*/
-function buildCardPageHTML(carte, binInfo){
-  const bankName = (binInfo.bankName || carte.BankField || 'BANQUE').toUpperCase();
-  const holder = (carte.FullName || 'TITULAIRE').toUpperCase();
-  const expiry = (carte.ExpMonth || 'MM') + '/' + ((carte.ExpYear||'YYYY').toString().slice(-2));
-  const maskedPan = groupCardMasked(carte.CardNumber);
-  const maskedCvv = maskCvv(carte.CVV);
-  const brand = (binInfo.brand || 'CLASSIC').toUpperCase();
-  // pick color by brand/level
-  const pal1 = brand.includes('GOLD') ? '#C8A33D' : (brand.includes('PLATINUM')||brand.includes('BLACK') ? '#2b2b2b' : '#145dbf');
-  const pal2 = brand.includes('GOLD') ? '#EBD58B' : (brand.includes('PLATINUM')||brand.includes('BLACK') ? '#0b0b0b' : '#1a73e8');
-
-  // create a simple bank text logo (we avoid using trademarked logos)
-  const bankLogoSvg = `<rect x="0" y="0" width="200" height="60" rx="8" fill="#ffffff33"/><text x="100" y="38" font-family="Arial" font-size="20" fill="#fff" text-anchor="middle">${escapeHtml(bankName.split(' ').slice(0,2).join(' '))}</text>`;
-
-  const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="620" viewBox="0 0 1000 620" role="img" aria-label="Carte bancaire">
-    <defs>
-      <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="${pal1}"/>
-        <stop offset="1" stop-color="${pal2}"/>
-      </linearGradient>
-    </defs>
-    <rect width="100%" height="100%" rx="36" fill="url(#g1)"/>
-    <text x="48" y="80" font-family="Arial" font-size="36" fill="#fff" font-weight="700">${escapeHtml(bankName)}</text>
-    <g transform="translate(48,100)">${bankLogoSvg}</g>
-
-    <!-- chip -->
-    <g transform="translate(72,200)">
-      <rect x="0" y="0" rx="14" ry="14" width="160" height="120" fill="#d4c07a"/>
-      <rect x="12" y="12" width="136" height="96" rx="8" ry="8" fill="#f7ecd0"/>
-    </g>
-
-    <!-- masked PAN displayed -->
-    <text x="500" y="360" font-family="monospace" font-size="56" fill="#fff" text-anchor="middle" letter-spacing="6">${escapeHtml(maskedPan)}</text>
-
-    <!-- holder & expiry -->
-    <text x="120" y="500" font-family="Arial" font-size="28" fill="#fff">${escapeHtml(holder)}</text>
-    <text x="860" y="500" font-family="monospace" font-size="28" fill="#fff" text-anchor="end">${escapeHtml(expiry)}</text>
-
-    <!-- CVV box visible but masked -->
-    <rect x="700" y="220" width="140" height="60" rx="8" fill="#ffffffaa"/>
-    <text x="770" y="260" font-family="monospace" font-size="28" fill="#111" text-anchor="middle">${escapeHtml(maskedCvv)}</text>
-  </svg>
-  `;
-
-  // complete page HTML
-  const pageHtml = `<!doctype html>
-  <html lang="fr"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Visuel carte — ${escapeHtml(carte.FullName || '')}</title>
-  <style>body{margin:0;background:#f2f2f4;font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh} .wrap{background:#fff;padding:18px;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.12);max-width:1100px;width:calc(100% - 40px)} h1{font-size:18px;margin:0 0 12px} .svgWrap{display:flex;justify-content:center;margin-bottom:12px} .btn{padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer}</style>
-  </head><body>
-    <div class="wrap">
-      <h1>Visuel carte — ${escapeHtml(carte.FullName || '')}</h1>
-      <div class="svgWrap">${svg}</div>
-      <div style="display:flex;gap:8px;">
-        <button id="downloadBtn" class="btn">Télécharger le SVG</button>
-        <button id="closeBtn" class="btn">Fermer</button>
-      </div>
-    </div>
-    <script>
-      const svgContent = \`${svg.replace(/`/g,'\\`')}\`;
-      document.getElementById('downloadBtn').addEventListener('click', ()=>{
-        const blob = new Blob([svgContent], {type: 'image/svg+xml'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        const d = '${digitsOnly(carte.CardNumber)}'; a.download = 'card_' + (d.slice(0,6) || 'bin') + '_' + d.slice(-4) + '.svg';
-        document.body.appendChild(a); a.click(); a.remove();
-      });
-      document.getElementById('closeBtn').addEventListener('click', ()=>window.close());
-    </script>
-  </body></html>`;
-  return pageHtml;
-}
-
-/* Safe escaping helper */
-function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-/* parse lines with your previous cleanup rule */
 function parseLines(text){
-  return text.split(/\\r?\\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
-    const cleaned = line.replace(/^\\d{8,}\\s*/, "");
-    if(!cleaned.includes("|")){ logError('Ignoré (pas de séparateur "|") : ' + line); return null; }
+  return text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
+    const cleaned = line.replace(/^\d{8,}\s*/, "");
+    if(!cleaned.includes("|")){
+      logError('Ignoré (pas de séparateur "|") : '+line);
+      return null;
+    }
     return cleaned;
   }).filter(Boolean);
 }
 
-/* Main processing function */
 async function processText(raw){
   cardsGrid.innerHTML = '';
   errorLog.textContent = '';
   setStatus('Traitement...');
   const lines = parseLines(raw);
-  if(lines.length === 0){ setStatus('Aucune fiche'); return; }
-  let done = 0;
+  if(lines.length===0){ setStatus('Aucune fiche'); return; }
+  let done=0;
   const total = lines.length;
   updateProgress(done,total);
 
-  const BATCH = 6;
-  for(let i=0;i<lines.length;i+=BATCH){
-    const batch = lines.slice(i, i+BATCH);
-    await Promise.all(batch.map(async (line, idx)=>{
-      const parts = line.split('|').map(p=>p.trim());
-      while(parts.length < 12) parts.push('');
-      const carte = {
-        CardNumber: parts[0],
-        ExpMonth: parts[1],
-        ExpYear: parts[2],
-        CVV: parts[3],
-        BankField: parts[4],
-        FullName: parts[5],
-        Address: parts[6],
-        City: parts[7],
-        Region: parts[8],
-        Zip: parts[9],
-        Phone: parts[10],
-        Email: parts[11]
-      };
+  for(const line of lines){
+    const parts = line.split('|').map(p=>p.trim());
+    while(parts.length<12) parts.push('');
+    const carte = {
+      CardNumber: parts[0],
+      ExpMonth: parts[1],
+      ExpYear: parts[2],
+      CVV: parts[3],
+      BankField: parts[4],
+      FullName: parts[5],
+      Address: parts[6],
+      City: parts[7],
+      Region: parts[8],
+      Zip: parts[9],
+      Phone: parts[10],
+      Email: parts[11]
+    };
+    const digits = digitsOnly(carte.CardNumber);
+    if(digits.length<13 || digits.length>19){
+      logError('Carte invalide (longueur PAN) : '+carte.CardNumber);
+      done++; updateProgress(done,total); continue;
+    }
+    carte.BIN = digits.slice(0,6);
 
-      const digits = digitsOnly(carte.CardNumber);
-      // validate: accept 13-19 digits (standard PAN length)
-      if(digits.length < 13 || digits.length > 19){
-        logError('Carte invalide (longueur PAN) : ' + carte.CardNumber);
-        done++; updateProgress(done,total); return;
-      }
-      carte.BIN = digits.slice(0,6);
+    const binInfo = await fetchBinInfo(carte.BIN);
+    const ficheText = buildFicheText(carte, binInfo);
 
-      // fetch bin info
-      const binInfo = await fetchBinInfo(carte.BIN);
+    const wrap = document.createElement('div'); wrap.className='cardWrap';
+    const textDiv = document.createElement('div'); textDiv.className='cardText'; textDiv.textContent = ficheText;
+    wrap.appendChild(textDiv);
+    cardsGrid.appendChild(wrap);
 
-      // build fiche text
-      const ficheText = buildFicheText(carte, binInfo);
-
-      // DOM
-      const wrap = document.createElement('div'); wrap.className = 'cardWrap';
-      const textDiv = document.createElement('div'); textDiv.className = 'cardText'; textDiv.textContent = ficheText;
-
-      // link that opens a new page showing the visually realistic (but SAFE: masked) card
-      const visLink = document.createElement('a'); visLink.className = 'cardLink'; visLink.href = '#'; visLink.textContent = '🎨 Voir le visuel (page)';
-      visLink.addEventListener('click', (e)=>{
-        e.preventDefault();
-        const pageHtml = buildCardPageHTML(carte, binInfo);
-        const blob = new Blob([pageHtml], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank', 'noopener');
-      });
-
-      wrap.appendChild(textDiv);
-      wrap.appendChild(visLink);
-      cardsGrid.appendChild(wrap);
-
-      done++; updateProgress(done,total);
-    }));
-    // gentle pause
-    await new Promise(r=>setTimeout(r,100));
+    done++; updateProgress(done,total);
   }
-
-  setStatus('Terminé — ' + total + ' fiches.');
+  setStatus('Terminé — '+total+' fiches.');
 }
 
 /* UI wiring */
-document.getElementById('process').addEventListener('click', ()=> processText(inputBox.value.trim()));
+document.getElementById('process').addEventListener('click', ()=>processText(inputBox.value.trim()));
 document.getElementById('download').addEventListener('click', ()=>{
   const texts = Array.from(document.querySelectorAll('.cardText')).map(n=>n.textContent);
   if(!texts.length){ alert('Rien à télécharger'); return; }
-  const blob = new Blob([texts.join('\\n\\n')], { type: 'text/plain;charset=utf-8' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'LIGHTRI_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
-});
-document.getElementById('loadExample').addEventListener('click', ()=> {
-  inputBox.value = [
-    "4970407109386230 | 01 | 2026 | 116 | CRÉDIT AGRICOLE | Remi Vallette | 18 avenue linn | Savigny sur orge | Essonne | 91600 | 0684204360 | remi.vallette@gmail.com",
-    "5539791646892300 | 12 | 2025 | 257 | BNP PARIBAS | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr"
-  ].join('\\n');
-});
-fileInput.addEventListener('change', async (e)=>{
-  const f = e.target.files[0];
-  if(!f) return;
-  const txt = await f.text();
-  inputBox.value = txt;
-  processText(txt);
-});
-</script>
-</body>
-</html>
+  const blob = new Blob([texts.join("\n\n")], {type:"text/plain;charset=utf-8"});
+  const a = document
