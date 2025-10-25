@@ -3,29 +3,26 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LIGHTRI — Fiches avec Placeholder</title>
+<title>LIGHTRI — Fiches BIN avec lien visuel</title>
 <style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#f8f9fb;color:#111;margin:0;padding:20px}
-  h1{margin:0 0 8px 0;font-weight:600}
-  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  textarea,input,button{font-family:inherit;font-size:15px}
-  textarea{width:100%;height:220px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;background:#fff;color:#111}
-  button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;cursor:pointer}
-  .note{font-size:13px;color:#666;margin-bottom:8px}
-  .progress{height:12px;background:#eee;border-radius:8px;overflow:hidden;margin:8px 0}
-  .progress>.bar{height:12px;background:#4caf50;width:0%;transition:width .18s linear}
-  #cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(720px,1fr));gap:12px;margin-top:16px}
-  .cardWrap{background:#fff;border-radius:10px;padding:12px;border:1px solid #e6e6e6;display:flex;gap:12px}
-  .cardText{white-space:pre-wrap;font-family:inherit;font-size:14px;color:#111;line-height:1.35;flex:1}
-  .cardRight{width:300px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-  .thumb{width:260px;height:160px;border-radius:8px;object-fit:cover;border:1px solid #ddd}
-  .link{color:#0b66ff;text-decoration:none;font-weight:600}
-  .btn-small{padding:6px 8px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#f8f9fb;color:#111;margin:0;padding:20px}
+h1{margin:0 0 8px 0;font-weight:600}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+textarea,input,button{font-family:inherit;font-size:15px}
+textarea{width:100%;height:220px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;background:#fff;color:#111}
+button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;cursor:pointer}
+.note{font-size:13px;color:#666;margin-bottom:8px}
+.progress{height:12px;background:#eee;border-radius:8px;overflow:hidden;margin:8px 0}
+.progress>.bar{height:12px;background:#4caf50;width:0%;transition:width .18s linear}
+#cardsGrid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:16px}
+.cardWrap{background:#fff;border-radius:10px;padding:12px;border:1px solid #e6e6e6;display:flex;flex-direction:column;gap:8px}
+.cardText{white-space:pre-wrap;font-family:inherit;font-size:14px;color:#111;line-height:1.35}
+.cardLink{color:#0b66ff;text-decoration:none;font-weight:600}
 </style>
 </head>
 <body>
-<h1>💳 LIGHTRI — Fiches + Placeholder</h1>
-<div class="note">Colle ton texte ou charge un .txt. Format attendu par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code></div>
+<h1>💳 LIGHTRI — Fiches BIN avec lien visuel</h1>
+<div class="note">Colle ton texte ou charge un .txt. Format par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code></div>
 
 <div class="controls">
   <input id="file" type="file" accept=".txt,.json" />
@@ -41,9 +38,7 @@
 <div id="cardsGrid"></div>
 
 <script>
-const BIN_API_BASE = 'https://bincheck.io/api/v1/bin/';
-const NOMINATIM_SEARCH = 'https://nominatim.openstreetmap.org/search';
-
+const API_BASE = "https://bincheck.io/api/v1/bin/";
 const inputBox = document.getElementById('input');
 const fileInput = document.getElementById('file');
 const cardsGrid = document.getElementById('cardsGrid');
@@ -55,44 +50,24 @@ function setStatus(s){ statusEl.textContent=s; }
 function updateProgress(done,total){ counterEl.textContent=`${done}/${total}`; progressBar.style.width = total? (done/total*100)+'%':'0%'; }
 function digitsOnly(s){ return (s||'').toString().replace(/\D/g,''); }
 function groupCard(n){ return digitsOnly(n).replace(/(\d{4})(?=\d)/g,'$1 '); }
-function countryCodeToEmoji(cc){ if(!cc) return ''; cc=cc.toUpperCase(); if(cc.length!==2)return ''; const A=0x1F1E6; return String.fromCodePoint(A+cc.charCodeAt(0)-65,A+cc.charCodeAt(1)-65); }
 
 async function fetchBinInfo(bin){
   try{
-    const r = await fetch(BIN_API_BASE + encodeURIComponent(bin));
+    const r = await fetch(API_BASE + encodeURIComponent(bin));
     if(!r.ok) throw new Error('HTTP '+r.status);
     return await r.json();
   }catch(e){ console.warn('fetchBinInfo failed',e); return null; }
 }
 
-async function geocode(address, city, zip){
-  const q = [address, city, zip, 'France'].filter(Boolean).join(' ');
-  try{
-    const r = await fetch(`${NOMINATIM_SEARCH}?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1`);
-    if(!r.ok) return null;
-    const arr = await r.json();
-    if(arr && arr.length>0) return { lat:parseFloat(arr[0].lat), lon:parseFloat(arr[0].lon), display_name:arr[0].display_name };
-  }catch(e){ console.warn('geocode failed', e); }
-  return null;
-}
+function countryCodeToEmoji(cc){ if(!cc) return ''; cc=cc.toUpperCase(); if(cc.length!==2)return ''; const A=0x1F1E6; return String.fromCodePoint(A+cc.charCodeAt(0)-65,A+cc.charCodeAt(1)-65); }
 
-async function findBankBranch(bankName, city){
-  const q = `${bankName} agence ${city} France`;
-  try{
-    const r = await fetch(`${NOMINATIM_SEARCH}?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1`);
-    if(!r.ok) return null;
-    const arr = await r.json();
-    if(arr && arr.length>0) return arr[0].display_name;
-  }catch(e){ console.warn('findBankBranch failed', e); }
-  return null;
-}
-
-function buildFicheText(carte, binInfo, branchAddress){
+function buildFicheText(carte, binInfo){
   const bank = (binInfo && binInfo.bank && binInfo.bank.name)?binInfo.bank.name:(carte.BankField||'Non spécifié');
   const brand = (binInfo && (binInfo.brand||binInfo.level))?(binInfo.brand||binInfo.level):'CLASSIC';
-  const type = (binInfo && binInfo.type)?binInfo.type:'Non spécifié';
-  const countryCode = (binInfo && binInfo.country && binInfo.country.alpha2)?binInfo.country.alpha2:'';
-  const flag = countryCodeToEmoji(countryCode);
+  const type = (binInfo && binInfo.type)?binInfo.type:'CREDIT';
+  const country = (binInfo && binInfo.country && binInfo.country.alpha2)?binInfo.country.alpha2:'';
+  const flag = countryCodeToEmoji(country);
+
   const lines=[];
   lines.push(`💳 +1 IMPO.UHQ ${flag}`);
   lines.push('└ '+groupCard(carte.CardNumber));
@@ -112,8 +87,7 @@ function buildFicheText(carte, binInfo, branchAddress){
   lines.push('├ 💳 Banque : '+bank);
   lines.push('├ 💳 Niveau : '+brand.toUpperCase());
   lines.push('├ 💳 Type : '+type.toUpperCase());
-  lines.push('├ 🏷️ Adresse agence : '+(branchAddress||'Non trouvée'));
-  lines.push('├ 🎨 Visuel : (lien ci-dessous)');
+  lines.push('├ 🎨 Visuel : '+`Lien ici`);
   lines.push('├ 📅 Expiration : '+(carte.ExpMonth||'')+'/'+(carte.ExpYear||''));
   lines.push('└ 🔒 Cryptogramme visuel : '+(carte.CVV||''));
   return lines.join('\n');
@@ -150,24 +124,21 @@ async function processText(text){
     carte.BIN=digits.slice(0,6);
 
     const binInfo=await fetchBinInfo(carte.BIN);
-    const branchAddress = await findBankBranch(binInfo && binInfo.bank && binInfo.bank.name ? binInfo.bank.name : carte.BankField, carte.City);
+    const ficheText=buildFicheText(carte, binInfo);
 
-    const ficheText=buildFicheText(carte, binInfo, branchAddress);
-
-    // DOM
     const wrap=document.createElement('div'); wrap.className='cardWrap';
-    const left=document.createElement('div'); left.className='cardText'; left.textContent=ficheText;
-    const right=document.createElement('div'); right.className='cardRight';
+    const textDiv=document.createElement('div'); textDiv.className='cardText'; textDiv.textContent=ficheText;
 
-    // placeholder image with bank name + brand + type
-    const img=document.createElement('img'); img.className='thumb';
-    const textLabel = encodeURIComponent(`${binInfo && binInfo.bank && binInfo.bank.name?binInfo.bank.name:carte.BankField} ${binInfo && (binInfo.brand||binInfo.level)?binInfo.brand||binInfo.level:'CLASSIC'} ${binInfo && binInfo.type?binInfo.type:'CREDIT'}`);
-    img.src=`https://via.placeholder.com/260x160.png?text=${textLabel}`;
-    img.alt='Visuel carte';
-
-    right.appendChild(img);
-    wrap.appendChild(left);
-    wrap.appendChild(right);
+    // lien cliquable vers placeholder
+    const link = document.createElement('a');
+    const textLabel = encodeURIComponent(`${carte.BankField || 'BANQUE'} ${carte.Level || 'CLASSIC'} ${carte.Type || 'CREDIT'}`);
+    link.href=`https://via.placeholder.com/400x250.png?text=${textLabel}`;
+    link.target='_blank';
+    link.className='cardLink';
+    link.textContent='🎨 Voir le visuel de la carte';
+    
+    wrap.appendChild(textDiv);
+    wrap.appendChild(link);
     cardsGrid.appendChild(wrap);
 
     done++; updateProgress(done,total);
