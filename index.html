@@ -3,409 +3,355 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>LIGHTRI — Le Trieur des Murailles</title>
-
-<!--
-  THEME: épique (style "Shingeki no Kyojin" — heroic / sky / murailles)
-  - Background image: Unsplash (libre de droit) — si tu préfères une autre image, remplace URL ci-dessous.
-  - Aucun asset sous licence restreinte n'est embarqué.
--->
-
+<title>LIGHTRI — Le Trieur des Murailles (v2)</title>
 <style>
-  :root{
-    --bg-overlay: rgba(12,11,10,0.55);
-    --accent: #cfa46b;
-    --accent-2: #8fbfe6;
-    --muted: #bfc9d9;
-    --card-bg: rgba(8,8,10,0.6);
-    --glass: rgba(255,255,255,0.03);
-    --radius: 12px;
-  }
-  html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial; color:#f3f5f7}
-  body{
-    background-image: url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1800&auto=format&fit=crop&s=5e139f0f2c0d6f7b2c4a19b5e9a1b7e3');
-    background-size:cover;
-    background-position: center 30%;
-    -webkit-font-smoothing:antialiased;
-    -moz-osx-font-smoothing:grayscale;
-    min-height:100vh;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:28px;
-  }
-
-  /* dark overlay */
-  .overlay{
-    position:fixed; inset:0; background:linear-gradient(180deg, rgba(2,6,23,0.45) 0%, rgba(2,6,23,0.65) 100%); pointer-events:none;
-  }
-
-  .wrap{
-    width:100%; max-width:1100px; background: linear-gradient(180deg, rgba(6,8,12,0.28), rgba(2,4,6,0.5));
-    border-radius:18px; box-shadow:0 10px 40px rgba(0,0,0,0.6); padding:22px; backdrop-filter: blur(6px);
-    border: 1px solid rgba(255,255,255,0.04);
-    position:relative;
-  }
-
-  header{
-    display:flex; gap:18px; align-items:center; margin-bottom:16px;
-  }
-  .crest{
-    width:86px; height:86px; border-radius:14px; background:linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01)); 
-    display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.03);
-    box-shadow: inset 0 -6px 18px rgba(0,0,0,0.45);
-    flex-shrink:0;
-  }
-  /* stylized wings crest using CSS */
-  .crest:before{
-    content:""; display:block; width:64px; height:64px; background:
-      radial-gradient(circle at 30% 35%, rgba(255,255,255,0.12), transparent 18%),
-      radial-gradient(circle at 70% 65%, rgba(255,255,255,0.06), transparent 22%);
-    border-radius:10px; transform:rotate(-8deg);
-  }
-
-  h1{
-    margin:0; font-size:22px; letter-spacing:1px; color:#fff;
-    display:flex; flex-direction:column;
-  }
-  h1 .title{
-    font-weight:700; font-size:20px;
-    display:flex; align-items:center; gap:12px;
-  }
-  h1 .subtitle{font-weight:300; color:var(--muted); font-size:12px; margin-top:4px}
-
-  /* animated shine on title */
-  .shiny{
-    position:relative;
-    display:inline-block;
-    color:var(--accent);
-    padding:6px 12px;
-    border-radius:999px;
-    background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    box-shadow: 0 2px 10px rgba(0,0,0,0.5), inset 0 -6px 18px rgba(0,0,0,0.2);
-    overflow:hidden;
-  }
-  .shiny:after{
-    content:""; position:absolute; left:-40%; top:0; width:40%; height:100%;
-    background: linear-gradient(90deg, rgba(255,255,255,0.0), rgba(255,255,255,0.25), rgba(255,255,255,0.0));
-    transform: skewX(-12deg);
-    animation: shine 4s linear infinite;
-    opacity:0.9;
-  }
-  @keyframes shine{
-    0% { left:-50% }
-    50% { left:100% }
-    100% { left:100% }
-  }
-
-  .controls{
-    display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center;
-  }
-  input[type=file]{background:var(--glass); padding:10px 12px; border-radius:10px; color:var(--muted); border:1px solid rgba(255,255,255,0.03);}
-  button{background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); color:var(--accent-2);
-    border:1px solid rgba(255,255,255,0.06); padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-  }
-  button.secondary{background:transparent; border:1px dashed rgba(255,255,255,0.04); color:var(--muted); font-weight:500}
-  .small{font-size:13px; color:var(--muted)}
-
-  main{display:flex; gap:18px; margin-top:18px;}
-  .left{flex:1; display:flex; flex-direction:column;}
-  .right{width:420px; min-width:320px; max-width:420px}
-
-  textarea#output{background:linear-gradient(180deg, rgba(5,8,12,0.55), rgba(12,12,12,0.45)); color:#eaf0ff; border-radius:12px; border:1px solid rgba(255,255,255,0.03); padding:14px; font-family:monospace; min-height:420px; resize:vertical}
-  pre#log{background:rgba(0,0,0,0.34); color:#cbe6ff; padding:12px; border-radius:8px; min-height:120px; overflow:auto; font-family:monospace; font-size:13px}
-
-  footer{margin-top:14px; display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:13px}
-  .note-box{background:rgba(255,255,255,0.02); padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.02)}
-
-  /* responsive */
-  @media (max-width:900px){
-    main{flex-direction:column;}
-    .right{width:100%}
-  }
+:root{
+  --accent:#cfa46b; --muted:#bfc9d9; --bg1:rgba(2,6,23,0.55);
+}
+html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;color:#eef2f7;background:#06101a}
+body{
+  background-image: url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop&s=5e139f0f2c0d6f7b2c4a19b5e9a1b7e3');
+  background-size:cover;background-position:center; padding:28px;
+}
+.overlay{position:fixed;inset:0;background:linear-gradient(180deg, rgba(3,6,13,0.55), rgba(3,6,9,0.75));pointer-events:none}
+.wrap{max-width:1200px;margin:0 auto;background:linear-gradient(180deg, rgba(6,8,12,0.36), rgba(6,8,12,0.55));border-radius:16px;padding:20px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 20px 60px rgba(0,0,0,0.6)}
+header{display:flex;align-items:center;gap:14px}
+.crest{width:72px;height:72px;border-radius:12px;background:linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));box-shadow:inset 0 -6px 18px rgba(0,0,0,0.35)}
+h1{margin:0;color:var(--accent);font-size:20px}
+.subtitle{color:var(--muted);font-size:13px;margin-top:6px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+input[type=file], textarea, input[type=number], input[type=text], select{
+  border-radius:10px;padding:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:#eaf0ff;
+}
+button{padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));color:var(--accent);cursor:pointer;font-weight:600}
+button.ghost{background:transparent;border:1px dashed rgba(255,255,255,0.04);color:var(--muted)}
+main{display:flex;gap:18px;margin-top:16px}
+.left{flex:1;display:flex;flex-direction:column}
+.right{width:420px;min-width:300px}
+textarea#pasteArea{min-height:180px;resize:vertical;font-family:monospace}
+textarea#output{min-height:420px;resize:vertical;font-family:monospace;background:linear-gradient(180deg, rgba(6,8,12,0.6), rgba(8,10,12,0.5));border-radius:12px;padding:14px;color:#eaf0ff}
+pre#log{min-height:120px;background:rgba(0,0,0,0.28);padding:12px;border-radius:8px;color:#cbe6ff;font-family:monospace;overflow:auto}
+.option{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.small{font-size:13px;color:var(--muted)}
+.note-box{background:rgba(255,255,255,0.02);padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);color:var(--muted)}
+.footer{display:flex;justify-content:space-between;margin-top:12px;color:var(--muted);font-size:13px}
+@media (max-width:900px){main{flex-direction:column}.right{width:100%}}
 </style>
 </head>
 <body>
   <div class="overlay" aria-hidden="true"></div>
-
   <div class="wrap" role="application" aria-label="LIGHTRI Le Trieur des Murailles">
     <header>
       <div class="crest" aria-hidden="true"></div>
-      <h1>
-        <span class="title">
-          <span class="shiny">LIGHTRI</span>
-          <span class="small" style="color:var(--muted); margin-left:6px">— Le Trieur des Murailles</span>
-        </span>
-        <span class="subtitle">Trieur automatique de fichiers .txt • BIN lookup avec fallback</span>
-      </h1>
+      <div>
+        <h1>LIGHTRI — <span style="color:#fff;font-weight:600">Le Trieur des Murailles</span></h1>
+        <div class="subtitle">Colle ton texte ou charge un fichier .txt • Nettoyage automatique • Masking & suppression</div>
+      </div>
     </header>
 
+    <!-- Controls -->
     <div class="controls" role="region" aria-label="Contrôles">
-      <input id="files" type="file" accept=".txt" multiple aria-label="Sélectionner des fichiers txt">
-      <button id="run">Traiter</button>
-      <button id="download" class="secondary">Télécharger</button>
-      <label class="small" style="display:flex;align-items:center;gap:8px;color:var(--muted)">
-        <input id="mask" type="checkbox"> Masquer numéros
-      </label>
-      <label class="small" style="display:flex;align-items:center;gap:8px;color:var(--muted)">
-        <input id="allowPublicProxy" type="checkbox"> Autoriser proxy publics
-      </label>
+      <input id="fileInput" type="file" accept=".txt" multiple aria-label="Sélectionner des fichiers .txt">
+      <button id="processFilesBtn">Traiter fichiers</button>
+      <button id="processPasteBtn" class="ghost">Traiter texte collé</button>
+      <button id="downloadBtn">Télécharger</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label class="option"><input id="remove8" type="checkbox"> Supprimer 8 premiers chiffres</label>
+        <label class="option">Masquer <input id="maskCount" type="number" value="10" min="0" style="width:64px"> derniers chiffres</label>
+      </div>
     </div>
 
     <main>
       <div class="left">
-        <div class="note-box small" role="note">
-          <strong>Aide rapide :</strong> chaque ligne du .txt doit être au format :
-          <code>CardNumber | ExpMonth | ExpYear | CVV | Bank | FullName | Address | City | City2 | Zip | Phone | Email</code>
-          <div style="margin-top:6px;color:var(--muted)">Remplace <code>PROXY_ENDPOINTS</code> dans le code par tes endpoints serverless (Netlify/Vercel/GuideUp/NetchiFly) si tu en as.</div>
+        <div class="note-box small">
+          <strong>1)</strong> Colle ton texte brut ci-dessous (ou choisis un .txt).<br>
+          <strong>2)</strong> Les lignes non conformes (petits numéros isolés) sont ignorés automatiquement.
         </div>
 
-        <textarea id="output" placeholder="Résultat..." readonly aria-label="Résultat formaté"></textarea>
+        <textarea id="pasteArea" placeholder="Colle ton texte ici (pas besoin de fichier) — chaque ligne = un enregistrement."></textarea>
+
+        <div style="margin-top:12px" class="note-box small">
+          <strong>Format attendu :</strong><br>
+          <code>CardNumber | ExpMonth | ExpYear | CVV | Country | FullName | Address | City | City2 | Zip | Phone | Email</code>
+        </div>
+
+        <textarea id="output" placeholder="Résultat formaté..." readonly aria-label="Résultat"></textarea>
       </div>
 
       <aside class="right">
-        <div style="margin-bottom:10px">
-          <div class="small" style="margin-bottom:6px">Logs / Débogage</div>
-          <pre id="log" aria-live="polite"></pre>
+        <div class="note-box small" style="margin-bottom:12px;">
+          <strong>Logs / Débogage</strong>
+          <div style="margin-top:8px"><pre id="log" aria-live="polite"></pre></div>
         </div>
 
         <div class="note-box small">
-          <strong>Confidentialité :</strong>
-          <div style="margin-top:6px">Ne traitez ici que les cartes dont vous avez l'autorisation. Les proxys publics exposent les BINs à des tiers.</div>
+          <strong>Confidentialité</strong>
+          <div style="margin-top:8px">Ne traitez que des données dont tu as l'autorisation. Le masque et la suppression aident à protéger les données affichées.</div>
         </div>
       </aside>
     </main>
 
-    <footer>
-      <div class="small">Theme: épique • design inspiré, images libres de droit</div>
-      <div class="small">Built for you — LIGHTRI</div>
-    </footer>
+    <div class="footer">
+      <div>Theme: épique — LIGHTRI</div>
+      <div>Built for you</div>
+    </div>
   </div>
 
 <script>
-/* ===========================
-   LIGHTRI logic (JS)
-   - Reads .txt files selected
-   - Splits lines, fields
-   - Cleans card numbers, extracts BIN (6 digits)
-   - Tries direct Binlist lookup, then PROXY_ENDPOINTS, then optional public proxies
-   - Fill result and allow download
-   NOTE: Replace PROXY_ENDPOINTS with your serverless URLs (recommended).
-   =========================== */
+/* =====================
+   LIGHTRI v2 JS
+   - paste area OR files
+   - ignores short numeric lines
+   - option: remove first 8 digits
+   - option: mask last N digits (replace by *)
+   - output + download
+   - preserves BIN lookup behavior (see PROXY endpoints)
+   ===================== */
 
-const fileInput = document.getElementById('files');
-const runBtn = document.getElementById('run');
+// CONFIG: put your serverless endpoints here if available.
+// Each endpoint should accept ?bin=123456 and return the Binlist JSON.
+const PROXY_ENDPOINTS = [
+  // "https://mon-site.netlify.app/.netlify/functions/binlookup?bin=",
+  // "https://mon-vercel.vercel.app/api/binlookup?bin="
+];
+
+// public proxies (optional)
+const PUBLIC_PROXIES = ["https://corsproxy.io/?", "https://api.allorigins.win/raw?url="];
+
+const fileInput = document.getElementById('fileInput');
+const processFilesBtn = document.getElementById('processFilesBtn');
+const processPasteBtn = document.getElementById('processPasteBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const pasteArea = document.getElementById('pasteArea');
 const output = document.getElementById('output');
 const logEl = document.getElementById('log');
-const downloadBtn = document.getElementById('download');
-const maskCheckbox = document.getElementById('mask');
-const allowPublicProxy = document.getElementById('allowPublicProxy');
+const remove8Box = document.getElementById('remove8');
+const maskCountInput = document.getElementById('maskCount');
 
-// === CONFIGURE HERE ===
-// If you deployed serverless functions (Netlify/Vercel/GuideUp/NetchiFly), put their base URLs here,
-// each should expect a query param `?bin=123456` and return JSON from Binlist.
-// Example:
-// "https://mon-site.netlify.app/.netlify/functions/binlookup?bin="
-// "https://mon-vercel.vercel.app/api/binlookup?bin="
-const PROXY_ENDPOINTS = [
-  // add your endpoints here, e.g. "https://ton-site.netlify.app/.netlify/functions/binlookup?bin="
-];
+function lg(...args){ logEl.textContent += args.join(' ') + '\\n'; logEl.scrollTop = logEl.scrollHeight; }
+function clearLog(){ logEl.textContent = ''; }
 
-// Public proxies (disabled unless user checks "Autoriser proxy publics")
-const PUBLIC_PROXIES = [
-  "https://corsproxy.io/?",
-  "https://api.allorigins.win/raw?url="
-];
-
-function lg(...args){
-  const s = args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
-  logEl.textContent += s + "\\n";
-  logEl.scrollTop = logEl.scrollHeight;
+function downloadText(filename, text){
+  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
-// display helper
-function formatNumberGroups(s){
-  return s.replace(/(\\d{4})(?=\\d)/g, '$1 ');
-}
-function maskCard(num){
-  const s = (num||'').replace(/\\D/g,'');
-  if(s.length <= 4) return '****';
-  return '**** **** **** ' + s.slice(-4);
+// utilities: detect if a line is probably an isolated short numeric ID (like 34932955)
+function isShortNumericLine(line){
+  const s = line.replace(/\\s+/g,'');
+  return (/^\\d{1,9}$/.test(s) && s.length < 12); // treat as extraneous (IDs etc)
 }
 
-/* BIN lookup:
-   1) try direct https://lookup.binlist.net/{bin}
-   2) try user-provided PROXY_ENDPOINTS
-   3) if user allowed, try PUBLIC_PROXIES
-*/
-async function binLookup(bin){
+function splitRecordsFromText(text){
+  // Some inputs include blank lines and small numeric IDs between records.
+  // We'll parse by finding lines that contain a '|' (the real records).
+  const lines = text.split(/\\r?\\n/);
+  const records = [];
+  for(const raw of lines){
+    const line = raw.trim();
+    if(!line) continue;
+    if(line.includes('|')){
+      // sometimes the record may have a trailing short id on next line: ignore those later
+      records.push(line);
+    } else {
+      // if line contains only digits and is short, skip (it's the extraneous ID)
+      if(isShortNumericLine(line)) {
+        lg('Ignored extraneous numeric line:', line);
+        continue;
+      }
+      // otherwise line without '|'—if it's long, maybe user pasted with no pipes, attempt to split by spaces?
+      // We'll skip uncertain lines to avoid false positives.
+      lg('Ignored non-record line (no |):', line.slice(0,80));
+    }
+  }
+  return records;
+}
+
+// mask last N digits: keep other digits, replace specified count before end with '*'
+function maskLastNDigits(numberString, n){
+  if(!n || n<=0) return numberString;
+  const digits = numberString.replace(/\\D/g,'');
+  if(digits.length === 0) return numberString;
+  const keep = digits.slice(0, Math.max(0, digits.length - n));
+  const masked = '*'.repeat(Math.min(n, digits.length));
+  // group visualize: produce groups of 4 for keep part and then masked tail
+  const groupedKeep = keep.replace(/(\\d{4})(?=\\d)/g, '$1 ');
+  return (groupedKeep ? groupedKeep + ' ' : '') + masked;
+}
+
+// format groups of 4 for display
+function group4(numStr){
+  const s = numStr.replace(/\\D/g,'');
+  return s.replace(/(\\d{4})(?=\\d)/g,'$1 ');
+}
+
+// BIN lookup — tries direct, then PROXY_ENDPOINTS, then public proxies if allowed
+async function binLookup(bin, allowPublicProxy=false){
   bin = String(bin).slice(0,6);
   if(!/^[0-9]{6}$/.test(bin)) return null;
-
   const direct = `https://lookup.binlist.net/${bin}`;
+  try{
+    lg('Trying direct binlist for', bin);
+    const r = await fetch(direct, {method:'GET', mode:'cors'});
+    if(r.ok) { lg('Direct binlist ok for', bin); return await r.json(); }
+    lg('Direct returned', r.status);
+  } catch(e){ lg('Direct fetch failed', e && e.message ? e.message : e); }
 
-  // Try direct
-  try {
-    lg('Trying direct Binlist for', bin);
-    const r = await fetch(direct, { method:'GET', mode:'cors' });
-    if(r.ok){
-      const j = await r.json();
-      lg('Direct Binlist success for', bin);
-      return j;
-    } else {
-      lg('Direct Binlist returned', r.status);
-    }
-  } catch(e){
-    lg('Direct Binlist fetch failed:', e && e.message ? e.message : e);
-  }
-
-  // Try user's endpoints
+  // try custom endpoints
   for(const base of PROXY_ENDPOINTS){
-    try {
+    try{
       const url = base + encodeURIComponent(bin);
       lg('Trying endpoint', url);
-      const r = await fetch(url, { method:'GET' });
-      if(r.ok){
-        const j = await r.json();
-        lg('Endpoint success for', bin);
-        return j;
-      } else {
-        lg('Endpoint returned', r.status);
-      }
-    } catch(e){
-      lg('Endpoint fetch failed:', e && e.message ? e.message : e);
-    }
+      const r = await fetch(url);
+      if(r.ok){ lg('Endpoint success', base); return await r.json(); }
+      lg('Endpoint returned', r.status);
+    } catch(e){ lg('Endpoint failed', e && e.message ? e.message : e); }
   }
 
-  // Try public proxies if allowed
-  if(allowPublicProxy.checked){
+  // public proxies if allowed
+  if(allowPublicProxy){
     for(const p of PUBLIC_PROXIES){
-      try {
+      try{
         const url = p + encodeURIComponent(direct);
         lg('Trying public proxy', p);
-        const r = await fetch(url, { method:'GET' });
-        if(r.ok){
-          const j = await r.json();
-          lg('Public proxy success for', bin);
-          return j;
-        } else {
-          lg('Public proxy returned', r.status);
-        }
-      } catch(e){
-        lg('Public proxy failed:', e && e.message ? e.message : e);
-      }
+        const r = await fetch(url);
+        if(r.ok){ lg('Public proxy success', p); return await r.json(); }
+        lg('Public proxy returned', r.status);
+      } catch(e){ lg('Public proxy failed', e && e.message ? e.message : e); }
     }
   }
 
-  lg('All BIN lookup attempts failed for', bin);
+  lg('BIN lookup failed for', bin);
   return null;
 }
 
-function buildBlock({displayCard, Carte, CardDigits, BIN, binInfo}){
-  const b = binInfo || {};
-  const scheme = b.scheme || 'Non spécifié';
-  const type = b.type || 'Non spécifié';
-  const brand = b.brand || 'Non spécifié';
-  const bankName = (b.bank && b.bank.name) || b.bankName || 'Non spécifié';
-  const countryName = (b.country && b.country.name) || b.countryName || 'Non spécifié';
+// Process an array of record lines
+async function processRecords(records){
+  let out = '';
+  clearLog();
+  lg('Processing', records.length, 'records');
+  for(const rec of records){
+    // fields split by '|'
+    const parts = rec.split('|').map(p => p.trim());
+    // ensure at least 12 fields (pad with '')
+    while(parts.length < 12) parts.push('');
+    const Carte = {
+      CardNumber: parts[0]||'',
+      ExpMonth: parts[1]||'',
+      ExpYear: parts[2]||'',
+      CVV: parts[3]||'',
+      Country: parts[4]||'',
+      FullName: parts[5]||'',
+      Address: parts[6]||'',
+      City: parts[7]||'',
+      City2: parts[8]||'',
+      Zip: parts[9]||'',
+      Phone: parts[10]||'',
+      Email: parts[11]||''
+    };
 
-  return `💳 +1 IMPO.UHQ 🇵🇸
-└ ${displayCard}
+    // Clean number: remove non-digits
+    let digits = (Carte.CardNumber || '').replace(/\\D/g,'');
+    if(!digits || digits.length < 6){ lg('Skipped: invalid card digits', Carte.CardNumber); continue; }
 
-🏦 Informations Personnelles
-├ 🕵️ Nom complet : ${Carte.FullName || ''}
-├ 🏠 Adresse : ${Carte.Address || ''}
-├ 📮 Zip : ${Carte.Zip || ''}
-├ 🏢 Ville : ${Carte.City || ''}
-├ 📞 Numéro de téléphone : ${Carte.Phone || ''}
-└ 📧 Email : ${Carte.Email || ''}
-
-🏦 Carte de Paiement
-├ 🍒 Titulaire : ${Carte.FullName || ''}
-├ 💳 Numéro de carte : ${displayCard}
-├ 💳 Bin : ${BIN || 'Non spécifié'}
-├ 💳 Réseau : ${scheme}
-├ 💳 Banque : ${bankName} (${countryName})
-├ 💳 Niveau : ${brand}
-├ 💳 Type : ${type}
-├ 📅 Expiration : ${Carte.ExpMonth || ''}/${Carte.ExpYear || ''}
-└ 🔒 Cryptogramme visuel : ${Carte.CVV || ''}
-`;
-}
-
-async function processFiles(fileList){
-  output.value = '';
-  logEl.textContent = '';
-  const files = Array.from(fileList);
-  if(files.length === 0){
-    alert('Choisis au moins un fichier .txt');
-    return;
-  }
-  lg('Starting processing', files.length, 'file(s)');
-  let final = '';
-
-  for(const file of files){
-    lg('Reading', file.name);
-    const text = await file.text();
-    const lines = text.split(/\\r?\\n/);
-    for(const raw of lines){
-      const line = raw.trim();
-      if(!line) continue;
-      const parts = line.split('|').map(p => p.trim());
-      while(parts.length < 12) parts.push('');
-      const Carte = {
-        CardNumber: parts[0]||'',
-        ExpMonth: parts[1]||'',
-        ExpYear: parts[2]||'',
-        CVV: parts[3]||'',
-        BankField: parts[4]||'',
-        FullName: parts[5]||'',
-        Address: parts[6]||'',
-        City: parts[7]||'',
-        City2: parts[8]||'',
-        Zip: parts[9]||'',
-        Phone: parts[10]||'',
-        Email: parts[11]||'',
-      };
-
-      const CardDigits = (Carte.CardNumber || '').replace(/\\D/g,'');
-      if(CardDigits.length < 6){
-        lg('Skipping: card <6 digits:', CardDigits);
-        continue;
-      }
-      const BIN = CardDigits.slice(0,6);
-      const binInfo = await binLookup(BIN);
-      const displayCard = maskCheckbox.checked ? maskCard(CardDigits) : formatNumberGroups(CardDigits);
-
-      const block = buildBlock({displayCard, Carte, CardDigits, BIN, binInfo});
-      final += block + "\\n";
-      // small pause
-      await new Promise(r => setTimeout(r, 120));
+    // Option: remove first 8 digits
+    if(remove8Box.checked){
+      if(digits.length > 8) digits = digits.slice(8);
+      else { digits = ''; lg('After remove8: card too short, skipped'); continue; }
     }
-  }
 
-  output.value = final.trim();
-  lg('Processing complete');
+    if(!digits || digits.length < 6){ lg('Skipped after remove8: too short'); continue; }
+    const BIN = digits.slice(0,6);
+
+    // BIN lookup (non-blocking if fails)
+    const binInfo = await binLookup(BIN, false);
+
+    // Mask if requested (maskCount can be > remaining length)
+    const maskN = parseInt(maskCountInput.value||'0',10);
+    const display = maskN>0 ? maskLastNDigits(digits, maskN) : group4(digits);
+
+    // build block
+    const scheme = (binInfo && binInfo.scheme) ? binInfo.scheme : 'Non spécifié';
+    const cardType = (binInfo && binInfo.type) ? binInfo.type : 'Non spécifié';
+    const brand = (binInfo && binInfo.brand) ? binInfo.brand : 'Non spécifié';
+    const bankName = (binInfo && binInfo.bank && binInfo.bank.name) ? binInfo.bank.name : 'Non spécifié';
+    const countryName = (binInfo && binInfo.country && binInfo.country.name) ? binInfo.country.name : 'Non spécifié';
+
+    const block = [
+`💳 +1 IMPO.UHQ
+└ ${display}`,
+``,
+`🏦 Informations Personnelles`,
+`├ 🕵️ Nom complet : ${Carte.FullName}`,
+`├ 🏠 Adresse : ${Carte.Address}`,
+`├ 📮 Zip : ${Carte.Zip}`,
+`├ 🏢 Ville : ${Carte.City}`,
+`├ 📞 Numéro de téléphone : ${Carte.Phone}`,
+`└ 📧 Email : ${Carte.Email}`,
+``,
+`🏦 Carte de Paiement`,
+`├ 🍒 Titulaire : ${Carte.FullName}`,
+`├ 💳 Numéro de carte : ${display}`,
+`├ 💳 Bin : ${BIN}`,
+`├ 💳 Réseau : ${scheme}`,
+`├ 💳 Banque : ${bankName} (${countryName})`,
+`├ 💳 Niveau : ${brand}`,
+`├ 💳 Type : ${cardType}`,
+`├ 📅 Expiration : ${Carte.ExpMonth}/${Carte.ExpYear}`,
+`└ 🔒 Cryptogramme visuel : ${Carte.CVV}`,
+``
+    ].join('\\n');
+
+    out += block + '\\n';
+    // small polite delay
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return out.trim();
 }
 
-// UI hooks
-runBtn.addEventListener('click', async ()=>{
-  await processFiles(fileInput.files);
-  alert('Traitement terminé');
+// Entry points
+
+// Process pasted text
+processPasteBtn.addEventListener('click', async ()=>{
+  const text = pasteArea.value || '';
+  if(!text.trim()){ alert('Colle du texte à traiter dans la zone prévue.'); return; }
+  const records = splitRecordsFromText(text);
+  if(records.length === 0){ alert('Aucun enregistrement valide trouvé (attendu des lignes contenant "|").'); return; }
+  const result = await processRecords(records);
+  output.value = result;
+  lg('Finished processing pasted text.');
 });
 
-downloadBtn.addEventListener('click', ()=>{
-  const txt = output.value;
-  if(!txt){ alert('Aucun résultat'); return; }
-  const blob = new Blob([txt], {type:'text/plain;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `LIGHTRI_Result_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.txt`;
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
+// Process selected files
+processFilesBtn.addEventListener('click', async ()=>{
+  const files = Array.from(fileInput.files || []);
+  if(files.length === 0){ alert('Choisis un ou plusieurs fichiers .txt'); return; }
+  // read all files and concatenate text
+  let allText = '';
+  for(const f of files){
+    try{
+      lg('Reading file', f.name);
+      const t = await f.text();
+      allText += '\\n' + t;
+    } catch(e){ lg('Failed to read file', f.name, e && e.message ? e.message : e); }
+  }
+  const records = splitRecordsFromText(allText);
+  if(records.length === 0){ alert('Aucun enregistrement valide trouvé dans les fichiers.'); return; }
+  const result = await processRecords(records);
+  output.value = result;
+  lg('Finished processing files.');
 });
+
+// Download output
+downloadBtn.addEventListener('click', ()=>{
+  if(!output.value){ alert('Aucun résultat à télécharger'); return; }
+  const filename = `LIGHTRI_Result_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.txt`;
+  downloadText(filename, output.value);
+});
+
 </script>
 </body>
 </html>
