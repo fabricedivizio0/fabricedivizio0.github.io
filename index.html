@@ -3,353 +3,382 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>LIGHTRI — Le Trieur des Murailles (v2)</title>
+<title>LIGHTRI — Le Trieur (sobre)</title>
 <style>
-:root{
-  --accent:#cfa46b; --muted:#bfc9d9; --bg1:rgba(2,6,23,0.55);
-}
-html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;color:#eef2f7;background:#06101a}
-body{
-  background-image: url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop&s=5e139f0f2c0d6f7b2c4a19b5e9a1b7e3');
-  background-size:cover;background-position:center; padding:28px;
-}
-.overlay{position:fixed;inset:0;background:linear-gradient(180deg, rgba(3,6,13,0.55), rgba(3,6,9,0.75));pointer-events:none}
-.wrap{max-width:1200px;margin:0 auto;background:linear-gradient(180deg, rgba(6,8,12,0.36), rgba(6,8,12,0.55));border-radius:16px;padding:20px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 20px 60px rgba(0,0,0,0.6)}
-header{display:flex;align-items:center;gap:14px}
-.crest{width:72px;height:72px;border-radius:12px;background:linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));box-shadow:inset 0 -6px 18px rgba(0,0,0,0.35)}
-h1{margin:0;color:var(--accent);font-size:20px}
-.subtitle{color:var(--muted);font-size:13px;margin-top:6px}
-.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
-input[type=file], textarea, input[type=number], input[type=text], select{
-  border-radius:10px;padding:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:#eaf0ff;
-}
-button{padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));color:var(--accent);cursor:pointer;font-weight:600}
-button.ghost{background:transparent;border:1px dashed rgba(255,255,255,0.04);color:var(--muted)}
-main{display:flex;gap:18px;margin-top:16px}
-.left{flex:1;display:flex;flex-direction:column}
-.right{width:420px;min-width:300px}
-textarea#pasteArea{min-height:180px;resize:vertical;font-family:monospace}
-textarea#output{min-height:420px;resize:vertical;font-family:monospace;background:linear-gradient(180deg, rgba(6,8,12,0.6), rgba(8,10,12,0.5));border-radius:12px;padding:14px;color:#eaf0ff}
-pre#log{min-height:120px;background:rgba(0,0,0,0.28);padding:12px;border-radius:8px;color:#cbe6ff;font-family:monospace;overflow:auto}
-.option{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
-.small{font-size:13px;color:var(--muted)}
-.note-box{background:rgba(255,255,255,0.02);padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);color:var(--muted)}
-.footer{display:flex;justify-content:space-between;margin-top:12px;color:var(--muted);font-size:13px}
-@media (max-width:900px){main{flex-direction:column}.right{width:100%}}
+  :root{
+    --bg:#0b1116;
+    --panel:#0f1720;
+    --muted:#9fb0c8;
+    --accent:#caa45f;
+    --card:#111720;
+    --glass: rgba(255,255,255,0.02);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:#e7f1fb;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1100px;margin:28px auto;padding:20px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03)}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+  .logo{width:64px;height:64px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;font-size:20px}
+  h1{margin:0;font-size:20px}
+  .subtitle{margin:4px 0 0;color:var(--muted);font-size:13px}
+
+  .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:14px 0}
+  input[type=file]{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:var(--glass);color:var(--muted)}
+  button{padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--accent);cursor:pointer;font-weight:600}
+  button.ghost{color:var(--muted);border:1px dashed rgba(255,255,255,0.03)}
+  .small{font-size:13px;color:var(--muted)}
+
+  main{display:flex;gap:18px}
+  .left{flex:1;display:flex;flex-direction:column}
+  .right{width:360px;min-width:280px}
+
+  textarea#pasteArea{min-height:180px;border-radius:10px;padding:12px;background:var(--card);border:1px solid rgba(255,255,255,0.03);color:#eaf3ff;resize:vertical;font-family:monospace}
+  textarea#output{min-height:420px;border-radius:10px;padding:12px;background:linear-gradient(180deg,#07101a,#0b1720);border:1px solid rgba(255,255,255,0.03);color:#eaf3ff;resize:vertical;font-family:monospace}
+  pre#log{min-height:120px;border-radius:8px;padding:10px;background:#071021;color:#9fcaf0;overflow:auto;font-family:monospace}
+
+  .opts{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .opts label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+  input[type=number]{width:72px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:var(--card);color:#eaf3ff}
+
+  .progress{height:8px;background:rgba(255,255,255,0.03);border-radius:8px;margin-top:10px;overflow:hidden}
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#ffd7a8);width:0%}
+
+  .note{margin-top:8px;color:var(--muted);font-size:13px}
+  .footer{display:flex;justify-content:space-between;margin-top:14px;color:var(--muted);font-size:13px}
+
+  @media (max-width:900px){
+    main{flex-direction:column}
+    .right{width:100%}
+  }
 </style>
 </head>
 <body>
-  <div class="overlay" aria-hidden="true"></div>
-  <div class="wrap" role="application" aria-label="LIGHTRI Le Trieur des Murailles">
+  <div class="wrap" role="application" aria-label="LIGHTRI trieur">
     <header>
-      <div class="crest" aria-hidden="true"></div>
+      <div class="logo" aria-hidden="true">L</div>
       <div>
-        <h1>LIGHTRI — <span style="color:#fff;font-weight:600">Le Trieur des Murailles</span></h1>
-        <div class="subtitle">Colle ton texte ou charge un fichier .txt • Nettoyage automatique • Masking & suppression</div>
+        <h1>LIGHTRI — Le Trieur</h1>
+        <div class="subtitle">Colle ton texte, ou charge des .txt — supprime/masque, lookup BIN via ton endpoint Netlify</div>
       </div>
     </header>
 
-    <!-- Controls -->
     <div class="controls" role="region" aria-label="Contrôles">
-      <input id="fileInput" type="file" accept=".txt" multiple aria-label="Sélectionner des fichiers .txt">
-      <button id="processFilesBtn">Traiter fichiers</button>
-      <button id="processPasteBtn" class="ghost">Traiter texte collé</button>
-      <button id="downloadBtn">Télécharger</button>
-      <div style="display:flex;gap:8px;align-items:center">
-        <label class="option"><input id="remove8" type="checkbox"> Supprimer 8 premiers chiffres</label>
-        <label class="option">Masquer <input id="maskCount" type="number" value="10" min="0" style="width:64px"> derniers chiffres</label>
-      </div>
+      <input id="fileInput" type="file" accept=".txt" multiple aria-label="choisir fichiers txt">
+      <button id="processFiles">Traiter fichiers</button>
+      <button id="processPaste" class="ghost">Traiter texte collé</button>
+      <button id="download">Télécharger résultat</button>
+      <div class="small" style="margin-left:auto">Records traités : <span id="count">0</span></div>
     </div>
 
     <main>
       <div class="left">
-        <div class="note-box small">
-          <strong>1)</strong> Colle ton texte brut ci-dessous (ou choisis un .txt).<br>
-          <strong>2)</strong> Les lignes non conformes (petits numéros isolés) sont ignorés automatiquement.
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+          <div style="flex:1">
+            <label class="small">Zone de texte (colle ton texte ici — tu n'as pas besoin d'un .txt)</label>
+            <textarea id="pasteArea" placeholder="Colle ton texte ici..."></textarea>
+          </div>
+          <div style="width:180px">
+            <div class="opts" style="flex-direction:column;align-items:flex-start">
+              <label><input id="remove8" type="checkbox"> Supprimer 8 premiers chiffres</label>
+              <label style="margin-top:6px">Masquer derniers <input id="maskN" type="number" value="10" min="0"> chiffres</label>
+              <label style="margin-top:6px"><input id="usePublicProxy" type="checkbox"> Autoriser proxies publics</label>
+            </div>
+          </div>
         </div>
 
-        <textarea id="pasteArea" placeholder="Colle ton texte ici (pas besoin de fichier) — chaque ligne = un enregistrement."></textarea>
+        <div class="note">Le parseur récupère automatiquement les lignes qui contiennent un caractère <code>|</code> ou qui commencent par un numéro de carte. Les petites lignes numériques isolées sont ignorées.</div>
 
-        <div style="margin-top:12px" class="note-box small">
-          <strong>Format attendu :</strong><br>
-          <code>CardNumber | ExpMonth | ExpYear | CVV | Country | FullName | Address | City | City2 | Zip | Phone | Email</code>
-        </div>
+        <textarea id="output" placeholder="Résultat formaté..." readonly></textarea>
 
-        <textarea id="output" placeholder="Résultat formaté..." readonly aria-label="Résultat"></textarea>
+        <div class="progress" aria-hidden="true"><i id="bar"></i></div>
       </div>
 
       <aside class="right">
-        <div class="note-box small" style="margin-bottom:12px;">
-          <strong>Logs / Débogage</strong>
-          <div style="margin-top:8px"><pre id="log" aria-live="polite"></pre></div>
+        <div style="margin-bottom:12px">
+          <div class="small">Logs / Débogage</div>
+          <pre id="log" aria-live="polite"></pre>
         </div>
 
-        <div class="note-box small">
-          <strong>Confidentialité</strong>
-          <div style="margin-top:8px">Ne traitez que des données dont tu as l'autorisation. Le masque et la suppression aident à protéger les données affichées.</div>
-        </div>
+        <div style="margin-top:10px" class="note">API Netlify utilisée automatiquement pour BIN lookup.</div>
       </aside>
     </main>
 
     <div class="footer">
-      <div>Theme: épique — LIGHTRI</div>
-      <div>Built for you</div>
+      <div class="small">LIGHTRI — sobre • stable</div>
+      <div class="small">Built for you</div>
     </div>
   </div>
 
 <script>
-/* =====================
-   LIGHTRI v2 JS
-   - paste area OR files
-   - ignores short numeric lines
-   - option: remove first 8 digits
-   - option: mask last N digits (replace by *)
-   - output + download
-   - preserves BIN lookup behavior (see PROXY endpoints)
-   ===================== */
+/*
+  LIGHTRI final v3
+  - uses your Netlify endpoint for BIN lookups
+  - robust parsing of pasted text or files
+  - processes all records sequentially
+  - options to remove first 8 digits and mask last N digits
+*/
 
-// CONFIG: put your serverless endpoints here if available.
-// Each endpoint should accept ?bin=123456 and return the Binlist JSON.
-const PROXY_ENDPOINTS = [
-  // "https://mon-site.netlify.app/.netlify/functions/binlookup?bin=",
-  // "https://mon-vercel.vercel.app/api/binlookup?bin="
-];
-
-// public proxies (optional)
+// ========== CONFIG ===========
+const NETLIFY_BASE = "https://celebrated-strudel-1c13f6.netlify.app/.netlify/functions/binlookup?bin="; 
+// public proxies (only if user allows)
 const PUBLIC_PROXIES = ["https://corsproxy.io/?", "https://api.allorigins.win/raw?url="];
+// ==============================
 
 const fileInput = document.getElementById('fileInput');
-const processFilesBtn = document.getElementById('processFilesBtn');
-const processPasteBtn = document.getElementById('processPasteBtn');
-const downloadBtn = document.getElementById('downloadBtn');
+const processFilesBtn = document.getElementById('processFiles');
+const processPasteBtn = document.getElementById('processPaste');
+const downloadBtn = document.getElementById('download');
 const pasteArea = document.getElementById('pasteArea');
 const output = document.getElementById('output');
 const logEl = document.getElementById('log');
 const remove8Box = document.getElementById('remove8');
-const maskCountInput = document.getElementById('maskCount');
+const maskNInput = document.getElementById('maskN');
+const usePublicProxyBox = document.getElementById('usePublicProxy');
+const countEl = document.getElementById('count');
+const bar = document.getElementById('bar');
 
-function lg(...args){ logEl.textContent += args.join(' ') + '\\n'; logEl.scrollTop = logEl.scrollHeight; }
+function lg(...args){
+  logEl.textContent += args.join(' ') + '\\n';
+  logEl.scrollTop = logEl.scrollHeight;
+}
 function clearLog(){ logEl.textContent = ''; }
 
-function downloadText(filename, text){
-  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function group4(s){
+  return s.replace(/(\\d{4})(?=\\d)/g,'$1 ');
+}
+function maskLast(s, n){
+  const digits = s.replace(/\\D/g,'');
+  if(n<=0) return group4(digits);
+  if(digits.length <= n) return '*'.repeat(digits.length);
+  const keep = digits.slice(0, digits.length - n);
+  const masked = '*'.repeat(n);
+  return group4(keep) + ' ' + masked;
 }
 
-// utilities: detect if a line is probably an isolated short numeric ID (like 34932955)
-function isShortNumericLine(line){
-  const s = line.replace(/\\s+/g,'');
-  return (/^\\d{1,9}$/.test(s) && s.length < 12); // treat as extraneous (IDs etc)
-}
-
-function splitRecordsFromText(text){
-  // Some inputs include blank lines and small numeric IDs between records.
-  // We'll parse by finding lines that contain a '|' (the real records).
-  const lines = text.split(/\\r?\\n/);
+// parse records robustly:
+// strategy:
+// 1) try regex to find segments starting with a long digit sequence (card) followed by rest of line containing '|'
+// 2) fallback: take any line containing '|' as record
+function extractRecordsFromText(text){
   const records = [];
+  if(!text) return records;
+  // normalize tabs -> spaces
+  const norm = text.replace(/\\t/g,' ');
+  // regex: card-like number (12-19 digits) followed by anything until end of line that contains a '|' 
+  const re = /\\d{12,19}[\\s\\S]*?\\|[^\\n\\r]*/g;
+  let m;
+  while((m = re.exec(norm)) !== null){
+    const rec = m[0].trim();
+    // sometimes regex captures only part; ensure it contains '|'
+    if(rec.includes('|')) records.push(rec);
+  }
+  if(records.length>0) return records;
+
+  // fallback: split by lines and take lines with '|'
+  const lines = norm.split(/\\r?\\n/);
   for(const raw of lines){
     const line = raw.trim();
     if(!line) continue;
     if(line.includes('|')){
-      // sometimes the record may have a trailing short id on next line: ignore those later
       records.push(line);
     } else {
-      // if line contains only digits and is short, skip (it's the extraneous ID)
-      if(isShortNumericLine(line)) {
-        lg('Ignored extraneous numeric line:', line);
-        continue;
+      // if line has a long digit string and rest on same line, try to recover (rare)
+      const m2 = line.match(/\\d{12,19}/);
+      if(m2 && line.includes(' ')){
+        // try to take substring from the card number onward
+        const idx = line.indexOf(m2[0]);
+        const sub = line.slice(idx);
+        if(sub.includes('|')) records.push(sub.trim());
+      } else {
+        // ignore short numeric lines (IDs)
       }
-      // otherwise line without '|'—if it's long, maybe user pasted with no pipes, attempt to split by spaces?
-      // We'll skip uncertain lines to avoid false positives.
-      lg('Ignored non-record line (no |):', line.slice(0,80));
     }
   }
   return records;
 }
 
-// mask last N digits: keep other digits, replace specified count before end with '*'
-function maskLastNDigits(numberString, n){
-  if(!n || n<=0) return numberString;
-  const digits = numberString.replace(/\\D/g,'');
-  if(digits.length === 0) return numberString;
-  const keep = digits.slice(0, Math.max(0, digits.length - n));
-  const masked = '*'.repeat(Math.min(n, digits.length));
-  // group visualize: produce groups of 4 for keep part and then masked tail
-  const groupedKeep = keep.replace(/(\\d{4})(?=\\d)/g, '$1 ');
-  return (groupedKeep ? groupedKeep + ' ' : '') + masked;
-}
-
-// format groups of 4 for display
-function group4(numStr){
-  const s = numStr.replace(/\\D/g,'');
-  return s.replace(/(\\d{4})(?=\\d)/g,'$1 ');
-}
-
-// BIN lookup — tries direct, then PROXY_ENDPOINTS, then public proxies if allowed
-async function binLookup(bin, allowPublicProxy=false){
+// BIN lookup: try NETLIFY endpoint, then public proxies if allowed
+async function binLookup(bin){
   bin = String(bin).slice(0,6);
   if(!/^[0-9]{6}$/.test(bin)) return null;
-  const direct = `https://lookup.binlist.net/${bin}`;
+  // 1) try Netlify endpoint (your own)
   try{
-    lg('Trying direct binlist for', bin);
-    const r = await fetch(direct, {method:'GET', mode:'cors'});
-    if(r.ok) { lg('Direct binlist ok for', bin); return await r.json(); }
-    lg('Direct returned', r.status);
-  } catch(e){ lg('Direct fetch failed', e && e.message ? e.message : e); }
-
-  // try custom endpoints
-  for(const base of PROXY_ENDPOINTS){
-    try{
-      const url = base + encodeURIComponent(bin);
-      lg('Trying endpoint', url);
-      const r = await fetch(url);
-      if(r.ok){ lg('Endpoint success', base); return await r.json(); }
-      lg('Endpoint returned', r.status);
-    } catch(e){ lg('Endpoint failed', e && e.message ? e.message : e); }
+    lg('BIN lookup via Netlify for', bin);
+    const r = await fetch(NETLIFY_BASE + encodeURIComponent(bin), { method:'GET' });
+    if(r.ok){
+      const j = await r.json();
+      return j;
+    } else {
+      lg('Netlify returned', r.status);
+    }
+  } catch(e){
+    lg('Netlify fetch error:', e && e.message ? e.message : e);
   }
 
-  // public proxies if allowed
-  if(allowPublicProxy){
+  // 2) try public proxies if user allows
+  if(usePublicProxyBox.checked){
     for(const p of PUBLIC_PROXIES){
       try{
-        const url = p + encodeURIComponent(direct);
+        const url = p + encodeURIComponent('https://lookup.binlist.net/' + bin);
         lg('Trying public proxy', p);
-        const r = await fetch(url);
-        if(r.ok){ lg('Public proxy success', p); return await r.json(); }
-        lg('Public proxy returned', r.status);
-      } catch(e){ lg('Public proxy failed', e && e.message ? e.message : e); }
+        const r = await fetch(url, { method:'GET' });
+        if(r.ok){
+          const j = await r.json();
+          return j;
+        } else {
+          lg('Public proxy returned', r.status);
+        }
+      } catch(e){
+        lg('Public proxy error', e && e.message ? e.message : e);
+      }
+      await sleep(200);
     }
   }
-
   lg('BIN lookup failed for', bin);
   return null;
 }
 
-// Process an array of record lines
-async function processRecords(records){
-  let out = '';
-  clearLog();
-  lg('Processing', records.length, 'records');
-  for(const rec of records){
-    // fields split by '|'
-    const parts = rec.split('|').map(p => p.trim());
-    // ensure at least 12 fields (pad with '')
-    while(parts.length < 12) parts.push('');
-    const Carte = {
-      CardNumber: parts[0]||'',
-      ExpMonth: parts[1]||'',
-      ExpYear: parts[2]||'',
-      CVV: parts[3]||'',
-      Country: parts[4]||'',
-      FullName: parts[5]||'',
-      Address: parts[6]||'',
-      City: parts[7]||'',
-      City2: parts[8]||'',
-      Zip: parts[9]||'',
-      Phone: parts[10]||'',
-      Email: parts[11]||''
-    };
+// process single record string (one line)
+async function processRecord(rec, options){
+  // rec expected to contain '|' separating fields
+  const parts = rec.split('|').map(p => p.trim());
+  // pad up to 12 fields
+  while(parts.length < 12) parts.push('');
+  const Carte = {
+    CardNumber: parts[0] || '',
+    ExpMonth: parts[1] || '',
+    ExpYear: parts[2] || '',
+    CVV: parts[3] || '',
+    Country: parts[4] || '',
+    FullName: parts[5] || '',
+    Address: parts[6] || '',
+    City: parts[7] || '',
+    City2: parts[8] || '',
+    Zip: parts[9] || '',
+    Phone: parts[10] || '',
+    Email: parts[11] || ''
+  };
 
-    // Clean number: remove non-digits
-    let digits = (Carte.CardNumber || '').replace(/\\D/g,'');
-    if(!digits || digits.length < 6){ lg('Skipped: invalid card digits', Carte.CardNumber); continue; }
+  // clean digits
+  let digits = (Carte.CardNumber || '').replace(/\\D/g,'');
+  if(!digits || digits.length < 6) {
+    lg('Skipped: card invalid or <6 digits:', Carte.CardNumber);
+    return null;
+  }
 
-    // Option: remove first 8 digits
-    if(remove8Box.checked){
-      if(digits.length > 8) digits = digits.slice(8);
-      else { digits = ''; lg('After remove8: card too short, skipped'); continue; }
-    }
+  // remove first 8 digits if required
+  if(options.remove8){
+    if(digits.length > 8) digits = digits.slice(8);
+    else { lg('Skipped: after removing 8 digits number too short'); return null; }
+  }
+  if(digits.length < 6){ lg('Skipped: less than 6 digits after remove8'); return null; }
 
-    if(!digits || digits.length < 6){ lg('Skipped after remove8: too short'); continue; }
-    const BIN = digits.slice(0,6);
+  const BIN = digits.slice(0,6);
 
-    // BIN lookup (non-blocking if fails)
-    const binInfo = await binLookup(BIN, false);
+  // call BIN lookup
+  const binInfo = await binLookup(BIN);
 
-    // Mask if requested (maskCount can be > remaining length)
-    const maskN = parseInt(maskCountInput.value||'0',10);
-    const display = maskN>0 ? maskLastNDigits(digits, maskN) : group4(digits);
+  // display number (mask or grouped)
+  const display = (options.maskN && options.maskN > 0) ? maskLast(digits, options.maskN) : group4(digits);
 
-    // build block
-    const scheme = (binInfo && binInfo.scheme) ? binInfo.scheme : 'Non spécifié';
-    const cardType = (binInfo && binInfo.type) ? binInfo.type : 'Non spécifié';
-    const brand = (binInfo && binInfo.brand) ? binInfo.brand : 'Non spécifié';
-    const bankName = (binInfo && binInfo.bank && binInfo.bank.name) ? binInfo.bank.name : 'Non spécifié';
-    const countryName = (binInfo && binInfo.country && binInfo.country.name) ? binInfo.country.name : 'Non spécifié';
+  // assemble result block
+  const scheme = (binInfo && binInfo.scheme) ? binInfo.scheme : 'Non spécifié';
+  const type = (binInfo && binInfo.type) ? binInfo.type : 'Non spécifié';
+  const brand = (binInfo && binInfo.brand) ? binInfo.brand : 'Non spécifié';
+  const bankName = (binInfo && binInfo.bank && binInfo.bank.name) ? binInfo.bank.name : 'Non spécifié';
+  const countryName = (binInfo && binInfo.country && binInfo.country.name) ? binInfo.country.name : 'Non spécifié';
 
-    const block = [
-`💳 +1 IMPO.UHQ
-└ ${display}`,
+  const block = [
+`💳 +1 CARD`,
+`└ ${display}`,
 ``,
 `🏦 Informations Personnelles`,
-`├ 🕵️ Nom complet : ${Carte.FullName}`,
-`├ 🏠 Adresse : ${Carte.Address}`,
-`├ 📮 Zip : ${Carte.Zip}`,
-`├ 🏢 Ville : ${Carte.City}`,
-`├ 📞 Numéro de téléphone : ${Carte.Phone}`,
-`└ 📧 Email : ${Carte.Email}`,
+`├ 🕵️ Nom complet : ${Carte.FullName || ''}`,
+`├ 🏠 Adresse : ${Carte.Address || ''}`,
+`├ 📮 Zip : ${Carte.Zip || ''}`,
+`├ 🏢 Ville : ${Carte.City || ''}`,
+`├ 📞 Numéro de téléphone : ${Carte.Phone || ''}`,
+`└ 📧 Email : ${Carte.Email || ''}`,
 ``,
 `🏦 Carte de Paiement`,
-`├ 🍒 Titulaire : ${Carte.FullName}`,
+`├ 🍒 Titulaire : ${Carte.FullName || ''}`,
 `├ 💳 Numéro de carte : ${display}`,
 `├ 💳 Bin : ${BIN}`,
 `├ 💳 Réseau : ${scheme}`,
 `├ 💳 Banque : ${bankName} (${countryName})`,
 `├ 💳 Niveau : ${brand}`,
-`├ 💳 Type : ${cardType}`,
-`├ 📅 Expiration : ${Carte.ExpMonth}/${Carte.ExpYear}`,
-`└ 🔒 Cryptogramme visuel : ${Carte.CVV}`,
+`├ 💳 Type : ${type}`,
+`├ 📅 Expiration : ${Carte.ExpMonth || ''}/${Carte.ExpYear || ''}`,
+`└ 🔒 Cryptogramme visuel : ${Carte.CVV || ''}`,
 ``
-    ].join('\\n');
+  ].join('\\n');
 
-    out += block + '\\n';
-    // small polite delay
-    await new Promise(r => setTimeout(r, 100));
-  }
-  return out.trim();
+  return { block, binInfo };
 }
 
-// Entry points
+// process many records sequentially
+async function processRecords(records, options){
+  const results = [];
+  clearLog();
+  lg('Total records found:', records.length);
+  countEl.textContent = '0';
+  bar.style.width = '0%';
 
-// Process pasted text
-processPasteBtn.addEventListener('click', async ()=>{
+  for(let i=0;i<records.length;i++){
+    const rec = records[i];
+    lg('Processing', i+1, '/', records.length);
+    const r = await processRecord(rec, options);
+    if(r && r.block){
+      results.push(r.block);
+    }
+    // update progress
+    const pct = Math.round(((i+1)/records.length)*100);
+    bar.style.width = pct + '%';
+    countEl.textContent = String(results.length);
+    // small delay
+    await sleep(120);
+  }
+
+  bar.style.width = '100%';
+  lg('Finished processing. Records output:', results.length);
+  return results.join('\\n');
+}
+
+// extract records from pasted text or file concatenation
+function getRecordsFromText(text){
+  return extractRecordsFromText(text);
+}
+
+// ===== UI bindings =====
+processPasteBtn.addEventListener('click', async () => {
   const text = pasteArea.value || '';
-  if(!text.trim()){ alert('Colle du texte à traiter dans la zone prévue.'); return; }
-  const records = splitRecordsFromText(text);
-  if(records.length === 0){ alert('Aucun enregistrement valide trouvé (attendu des lignes contenant "|").'); return; }
-  const result = await processRecords(records);
-  output.value = result;
-  lg('Finished processing pasted text.');
+  if(!text.trim()){ alert('Colle ton texte dans la zone prévue.'); return; }
+  const records = getRecordsFromText(text);
+  if(records.length === 0){ alert('Aucun enregistrement valide trouvé (attend des lignes contenant "|").'); return; }
+  const out = await processRecords(records, { remove8: remove8Box.checked, maskN: parseInt(maskNInput.value||'0',10) });
+  output.value = out;
 });
 
-// Process selected files
-processFilesBtn.addEventListener('click', async ()=>{
+processFilesBtn.addEventListener('click', async () => {
   const files = Array.from(fileInput.files || []);
   if(files.length === 0){ alert('Choisis un ou plusieurs fichiers .txt'); return; }
-  // read all files and concatenate text
-  let allText = '';
+  let combined = '';
   for(const f of files){
-    try{
-      lg('Reading file', f.name);
-      const t = await f.text();
-      allText += '\\n' + t;
-    } catch(e){ lg('Failed to read file', f.name, e && e.message ? e.message : e); }
+    try{ lg('Reading file', f.name); const t = await f.text(); combined += '\\n' + t; } catch(e){ lg('Failed read', f.name, e && e.message ? e.message : e); }
   }
-  const records = splitRecordsFromText(allText);
+  const records = getRecordsFromText(combined);
   if(records.length === 0){ alert('Aucun enregistrement valide trouvé dans les fichiers.'); return; }
-  const result = await processRecords(records);
-  output.value = result;
-  lg('Finished processing files.');
+  const out = await processRecords(records, { remove8: remove8Box.checked, maskN: parseInt(maskNInput.value||'0',10) });
+  output.value = out;
 });
 
-// Download output
-downloadBtn.addEventListener('click', ()=>{
+downloadBtn.addEventListener('click', () => {
   if(!output.value){ alert('Aucun résultat à télécharger'); return; }
   const filename = `LIGHTRI_Result_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.txt`;
-  downloadText(filename, output.value);
+  const blob = new Blob([output.value], {type:'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 });
 
 </script>
