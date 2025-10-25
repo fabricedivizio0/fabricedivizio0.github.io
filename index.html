@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LIGHTRI — Correction : sauts de ligne & multi-fiches</title>
+<title>LIGHTRI — Nettoyage robuste & logs</title>
 <style>
 body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#f8f9fb;color:#111;margin:0;padding:20px}
 h1{margin:0 0 8px 0;font-weight:600}
-.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-textarea,input,button{font-family:inherit;font-size:15px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+textarea,input,button,label{font-family:inherit;font-size:15px}
 textarea{width:100%;height:200px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;background:#fff;color:#111}
 button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;cursor:pointer}
 .note{font-size:13px;color:#666;margin-bottom:8px}
@@ -17,16 +17,18 @@ button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;
 #cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(720px,1fr));gap:12px;margin-top:16px}
 .cardWrap{background:#fff;border-radius:10px;padding:12px;border:1px solid #e6e6e6;display:flex;flex-direction:column;gap:8px}
 .cardText{white-space:pre-wrap;font-family:inherit;font-size:14px;color:#111;line-height:1.35}
-#errorLog{height:140px;background:#fff0f0;border:1px solid #f99;padding:8px;overflow:auto;font-size:13px;color:#900;white-space:pre-wrap;margin-top:12px;border-radius:6px;}
-.small{font-size:13px;color:#666}
-code{background:#f4f4f6;padding:2px 6px;border-radius:4px}
+#errorLog{height:160px;background:#fff8f8;border:1px solid #f2a1a1;padding:8px;overflow:auto;font-size:13px;color:#900;white-space:pre-wrap;margin-top:12px;border-radius:6px;}
+.small{font-size:13px;color:#666;margin-left:8px}
+.check{display:flex;align-items:center;gap:6px}
 </style>
 </head>
 <body>
-<h1>💳 LIGHTRI — Correction</h1>
+<h1>💳 LIGHTRI — Nettoyage robuste</h1>
+
 <div class="note">
-  Colle ton texte ou charge un fichier <code>.txt</code>.<br>
-  Format par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code>
+  - Ce script nettoie les caractères invisibles (non‑breaking spaces, zero‑width, etc.) et extrait uniquement les chiffres.<br>
+  - Si après extraction il y a <code>&lt; 6</code> chiffres, la fiche sera ignorée sauf si tu coches « Forcer le traitement ».<br>
+  - Les erreurs détaillées (ligne originale + chiffres extraits) s'affichent dans le log d'erreurs.
 </div>
 
 <div class="controls">
@@ -34,6 +36,7 @@ code{background:#f4f4f6;padding:2px 6px;border-radius:4px}
   <button id="process">Traiter</button>
   <button id="download">Télécharger fiches</button>
   <button id="loadExample">Charger exemple</button>
+  <label class="check"><input id="force" type="checkbox"/> <span class="small">Forcer le traitement même si &lt; 6 chiffres</span></label>
 </div>
 
 <div class="small">Progrès <span id="counter">0/0</span> — <span id="status">Prêt</span></div>
@@ -43,19 +46,16 @@ code{background:#f4f4f6;padding:2px 6px;border-radius:4px}
 
 <div id="cardsGrid"></div>
 
-<div class="note">Erreurs (uniquement) :</div>
+<div class="note">Erreurs / détails :</div>
 <div id="errorLog" aria-live="polite"></div>
 
 <script>
-/* ---------- CONFIG & local bins (same as before) ---------- */
+/* ---------- CONFIG ---------- */
 const BINLIST_BASE = 'https://lookup.binlist.net/';
 const LOCAL_BINS_EMBEDDED = {
   "497040":{"bank":"CRÉDIT AGRICOLE","brand":"CLASSIC","type":"DEBIT","country":"France"},
   "513379":{"bank":"BNP PARIBAS","brand":"CLASSIC","type":"CREDIT","country":"France"},
-  "553979":{"bank":"SOCIETE GENERALE","brand":"CLASSIC","type":"DEBIT","country":"France"},
-  "457631":{"bank":"BANQUE FRANCAISE","brand":"GOLD","type":"CREDIT","country":"France"},
-  "402360":{"bank":"LCL","brand":"CLASSIC","type":"DEBIT","country":"France"},
-  "497011":{"bank":"BPCE","brand":"GOLD","type":"CREDIT","country":"France"}
+  "553979":{"bank":"SOCIETE GENERALE","brand":"CLASSIC","type":"DEBIT","country":"France"}
 };
 window.__LOCAL_BINS = Object.assign({}, LOCAL_BINS_EMBEDDED);
 
@@ -67,33 +67,64 @@ const progressBar = document.getElementById('progressBar');
 const counterEl = document.getElementById('counter');
 const statusEl = document.getElementById('status');
 const errorLog = document.getElementById('errorLog');
+const forceCheckbox = document.getElementById('force');
 
-/* ---------- Helpers ---------- */
-function setStatus(s){ statusEl.textContent = s; }
-function updateProgress(done,total){ counterEl.textContent = `${done}/${total}`; progressBar.style.width = total ? Math.round((done/total)*100) + '%' : '0%'; }
-function digitsOnly(s){ return (s||'').toString().replace(/\D/g,''); }
+/* ---------- Helpers robust cleaning ---------- */
+
+/* normalizeWhitespace:
+   - replace various unicode whitespace / invisible chars with normal space or remove
+   - trim ends
+*/
+function normalizeWhitespace(s){
+  if(!s) return '';
+  // remove zero-width and BOM and other invisible chars
+  s = s.replace(/[\u200B-\u200F\uFEFF]/g, '');
+  // replace non-breaking spaces and many unicode spaces with normal space
+  s = s.replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g,' ');
+  // collapse multiple spaces/tabs
+  s = s.replace(/\s+/g,' ').trim();
+  return s;
+}
+
+/* digitsOnly: extract digits only (0-9) */
+function digitsOnly(s){
+  if(!s) return '';
+  // first normalize to remove invisible whitespace that might break things
+  s = normalizeWhitespace(s);
+  // then remove every non-digit
+  return s.replace(/\D/g,'');
+}
+
+/* logging */
+function logError(msg){
+  const time = new Date().toLocaleTimeString();
+  errorLog.textContent += `[${time}] ${msg}\n`;
+  errorLog.scrollTop = errorLog.scrollHeight;
+}
+
+/* group card visually */
 function groupCard(num){ return digitsOnly(num).replace(/(\d{4})(?=\d)/g,'$1 '); }
-function logError(msg){ errorLog.textContent += msg + '\n'; errorLog.scrollTop = errorLog.scrollHeight; }
 
-/* ---------- fetch BIN info (local first, then Binlist) ---------- */
+/* fetch bin info (local first, fallback to binlist) */
 async function fetchBinInfo(bin){
+  if(!bin) return { bankName:'Non spécifié', brand:'CLASSIC', type:'CREDIT', country:'' };
   try{
     if(window.__LOCAL_BINS && window.__LOCAL_BINS[bin]){
       const v = window.__LOCAL_BINS[bin];
       return {
-        bankName: v.bank || v.bank_name || '',
+        bankName: v.bank || v.bank_name || v.bankName || 'Non spécifié',
         brand: v.brand || v.level || v.scheme || 'CLASSIC',
         type: (v.type || '').toUpperCase() || 'CREDIT',
         country: v.country || ''
       };
     }
-  }catch(err){ /* ignore */ }
-
+  }catch(e){
+    // ignore
+  }
   try{
     const res = await fetch(BINLIST_BASE + encodeURIComponent(bin), { headers: { 'Accept-Version':'3' }});
     if(!res.ok){
-      // log concise message but return defaults
-      logError(`BIN ${bin} non trouvé sur Binlist (HTTP ${res.status})`);
+      logError(`BIN ${bin} non trouvé sur Binlist (HTTP ${res.status}) — fallback valeurs par défaut.`);
       return { bankName:'Non spécifié', brand:'CLASSIC', type:'CREDIT', country:'' };
     }
     const j = await res.json();
@@ -109,7 +140,7 @@ async function fetchBinInfo(bin){
   }
 }
 
-/* ---------- Build fiche text (use real newline \n, not '\\n') ---------- */
+/* build fiche text (with real newlines) */
 function buildFicheText(carte, binInfo){
   const lines = [];
   lines.push('💳 +1 IMPO.UHQ');
@@ -132,21 +163,20 @@ function buildFicheText(carte, binInfo){
   lines.push('├ 💳 Type : ' + (binInfo.type || 'CREDIT').toString().toUpperCase());
   lines.push('├ 📅 Expiration : ' + (carte.ExpMonth || '') + '/' + (carte.ExpYear || ''));
   lines.push('└ 🔒 Cryptogramme visuel : ' + (carte.CVV || ''));
-  // IMPORTANT: join with actual newline char
   return lines.join('\n');
 }
 
-/* ---------- Parse lines robustly (keeps original cleaning rule) ---------- */
+/* parse lines robustly */
 function parseLines(text){
-  // split lines, trim, keep non-empty
-  const raw = text.split(/\r?\n/);
+  const rows = text.split(/\r?\n/);
   const out = [];
-  for(let line of raw){
-    const l = line.trim();
-    if(!l) continue;
-    const cleaned = l.replace(/^\d{8,}\s*/, "");
-    if(!cleaned.includes("|")){
-      logError('Ignoré (pas de séparateur "|") : ' + l);
+  for(let rawLine of rows){
+    const line = rawLine.trim();
+    if(!line) continue;
+    // apply whitespace normalization (keeps separators)
+    const cleaned = normalizeWhitespace(line);
+    if(!cleaned.includes('|')){
+      logError(`Ignoré (pas de séparateur "|") : "${line}"`);
       continue;
     }
     out.push(cleaned);
@@ -154,7 +184,7 @@ function parseLines(text){
   return out;
 }
 
-/* ---------- Main: process all lines (no early termination) ---------- */
+/* main processing with detailed logs about extracted digits */
 async function processText(raw){
   cardsGrid.innerHTML = '';
   errorLog.textContent = '';
@@ -167,8 +197,9 @@ async function processText(raw){
 
   const BATCH = 6;
   for(let i=0;i<lines.length;i+=BATCH){
-    const batch = lines.slice(i,i+BATCH);
+    const batch = lines.slice(i, i+BATCH);
     await Promise.all(batch.map(async (line) => {
+      // split into parts
       const parts = line.split('|').map(p => p.trim());
       while(parts.length < 12) parts.push('');
       const carte = {
@@ -186,73 +217,79 @@ async function processText(raw){
         Email: parts[11]
       };
 
+      // extract digits robustly
       const digits = digitsOnly(carte.CardNumber);
       if(digits.length < 6){
-        logError('Carte ignorée (trop courte pour BIN) : ' + carte.CardNumber);
-        done++; updateProgress(done,total);
-        return;
+        logError(`Carte ignorée (trop courte pour BIN) — ligne: "${line}" | chiffres extraits: "${digits}" (len=${digits.length})`);
+        if(!forceCheckbox.checked){
+          done++; updateProgress(done,total);
+          return;
+        } else {
+          // force: proceed but BIN will be empty and bin lookup skipped
+          logError(`→ Forcé : création de fiche sans BIN pour la ligne ci‑dessus.`);
+        }
       }
-      carte.BIN = digits.slice(0,6);
 
-      const binInfo = await fetchBinInfo(carte.BIN);
+      carte.BIN = digits.length >= 6 ? digits.slice(0,6) : '';
+
+      // fetch bin info if we have a BIN
+      const binInfo = carte.BIN ? await fetchBinInfo(carte.BIN) : { bankName:'Non spécifié', brand:'CLASSIC', type:'CREDIT', country:'' };
+
+      // build fiche and append
       const ficheText = buildFicheText(carte, binInfo);
-
       const wrap = document.createElement('div'); wrap.className = 'cardWrap';
-      const txt = document.createElement('div'); txt.className = 'cardText';
-      // set textContent — with CSS white-space:pre-wrap this will render new lines correctly
-      txt.textContent = ficheText;
+      const txt = document.createElement('div'); txt.className = 'cardText'; txt.textContent = ficheText;
       wrap.appendChild(txt);
       cardsGrid.appendChild(wrap);
 
       done++; updateProgress(done,total);
     }));
-    // polite pause
     await new Promise(r => setTimeout(r, 120));
   }
 
   setStatus('Terminé — ' + total + ' fiches.');
 }
 
-/* ---------- UI wiring ---------- */
-document.getElementById('process').addEventListener('click', () => processText(inputBox.value.trim()));
+/* UI wiring */
+function setStatus(s){ statusEl.textContent = s; }
+function updateProgress(done,total){ counterEl.textContent = `${done}/${total}`; progressBar.style.width = total ? Math.round((done/total)*100) + '%' : '0%'; }
 
-document.getElementById('download').addEventListener('click', () => {
+/* buttons */
+document.getElementById('process').addEventListener('click', ()=> processText(inputBox.value.trim()));
+document.getElementById('download').addEventListener('click', ()=>{
   const texts = Array.from(document.querySelectorAll('.cardText')).map(n => n.textContent);
   if(!texts.length){ alert('Rien à télécharger'); return; }
   const blob = new Blob([texts.join('\n\n')], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'LIGHTRI_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
 });
+document.getElementById('loadExample').addEventListener('click', ()=>{
+  inputBox.value = [
+    "4970 4071 0938 6230 | 01 | 2026 | 116 | CRÉDIT AGRICOLE | Remi Vallette | 18 avenue linn | Savigny sur orge | Ile-de-France | 91600 | 0684204360 | remi.vallette@gmail.com",
+    "5133791059685621 | 02 | 2026 | 500 | BNP PARIBAS | Dicanot | 42 boulevard Dubreuil | Bures-sur-Yvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com",
+    "5539791646892300 | 12 | 2025 | 257 | SOCIETE GENERALE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr"
+  ].join('\n');
+  processText(inputBox.value);
+});
 
 /* file load */
-fileInput.addEventListener('change', async (e) => {
+fileInput.addEventListener('change', async (e)=>{
   const f = e.target.files[0];
   if(!f) return;
+  // if json, attempt to load local bins mapping
   if(f.name.toLowerCase().endsWith('.json')){
     try{
       const txt = await f.text();
       const parsed = JSON.parse(txt);
       if(parsed && typeof parsed === 'object'){
         window.__LOCAL_BINS = parsed;
-        alert('bins.json chargé localement — utilisé prioritairement.');
-      } else {
-        alert('JSON bins invalide');
-      }
+        alert('bins.json local chargé et utilisé en priorité pour lookups.');
+      } else alert('JSON bins invalide (attendu mapping BIN->info).');
     }catch(err){ alert('Erreur lecture JSON: ' + err.message); }
     return;
   }
   const txt = await f.text();
   inputBox.value = txt;
   processText(txt);
-});
-
-/* load sample */
-document.getElementById('loadExample').addEventListener('click', ()=>{
-  inputBox.value = [
-    "4970407109386230 | 01 | 2026 | 116 | CRÉDIT AGRICOLE | Remi Vallette | 18 avenue linn | Savigny sur orge | Ile-de-France | 91600 | 0684204360 | remi.vallette@gmail.com",
-    "5133791059685621 | 02 | 2026 | 500 | BNP PARIBAS | Dicanot | 42 boulevard Dubreuil | Bures-sur-Yvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com",
-    "5539791646892300 | 12 | 2025 | 257 | SOCIETE GENERALE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr"
-  ].join('\n');
-  processText(inputBox.value);
 });
 </script>
 </body>
