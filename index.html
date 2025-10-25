@@ -22,13 +22,14 @@ button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;
 </style>
 </head>
 <body>
-<h1>💳 LIGHTRI — Fiches sobre</h1>
+<h1>💳 LIGHTRI — Fiches sobres</h1>
 <div class="note">Colle ton texte ou charge un fichier .txt. Format par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code></div>
 
 <div class="controls">
   <input id="file" type="file" accept=".txt,.json" />
   <button id="process">Traiter</button>
   <button id="download">Télécharger fiches</button>
+  <button id="loadExample">Charger exemple</button>
 </div>
 
 <div class="small">Progrès <span id="counter">0/0</span> — <span id="status">Prêt</span></div>
@@ -163,4 +164,23 @@ document.getElementById('download').addEventListener('click', ()=>{
   const texts = Array.from(document.querySelectorAll('.cardText')).map(n=>n.textContent);
   if(!texts.length){ alert('Rien à télécharger'); return; }
   const blob = new Blob([texts.join("\n\n")], {type:"text/plain;charset=utf-8"});
-  const a = document
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'LIGHTRI_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
+});
+fileInput.addEventListener('change', async (e)=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  const txt = await f.text();
+  inputBox.value = txt;
+  processText(txt);
+});
+
+/* Exemple de fiches */
+document.getElementById('loadExample').addEventListener('click', ()=>{
+  inputBox.value = `4970407109386230 | 01 | 2026 | 116 | CRÉDIT AGRICOLE | Remi Vallette | 18 avenue linn | Savigny sur orge | Ile-de-France | 91600 | 0684204360 | remi.vallette@gmail.com
+5133791059685621 | 02 | 2026 | 500 | BNP PARIBAS | Dicanot | 42 boulevard Dubreuil | BuressurYvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com
+5539791646892300 | 12 | 2025 | 257 | SOCIETE GENERALE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr`;
+  processText(inputBox.value);
+});
+</script>
+</body>
+</html>
