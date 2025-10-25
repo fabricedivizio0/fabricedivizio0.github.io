@@ -3,37 +3,34 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LIGHTRI — Trieur (bincheck.io + agence ≈ Nominatim + Maps)</title>
+<title>LIGHTRI — Fiches avec Placeholder</title>
 <style>
-  :root{--bg:#f8f9fb;--fg:#111;--muted:#666}
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--fg);margin:0;padding:20px}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#f8f9fb;color:#111;margin:0;padding:20px}
   h1{margin:0 0 8px 0;font-weight:600}
   .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
   textarea,input,button{font-family:inherit;font-size:15px}
-  textarea{width:100%;height:220px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;background:#fff;color:var(--fg)}
+  textarea{width:100%;height:220px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:vertical;background:#fff;color:#111}
   button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;cursor:pointer}
-  .note{font-size:13px;color:var(--muted);margin-bottom:8px}
+  .note{font-size:13px;color:#666;margin-bottom:8px}
   .progress{height:12px;background:#eee;border-radius:8px;overflow:hidden;margin:8px 0}
   .progress>.bar{height:12px;background:#4caf50;width:0%;transition:width .18s linear}
-  #cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(620px,1fr));gap:12px;margin-top:16px}
+  #cardsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(720px,1fr));gap:12px;margin-top:16px}
   .cardWrap{background:#fff;border-radius:10px;padding:12px;border:1px solid #e6e6e6;display:flex;gap:12px}
-  .cardText{white-space:pre-wrap;font-family:inherit;font-size:14px;color:var(--fg);line-height:1.35;flex:1}
-  .cardRight{width:260px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-  .thumb{width:240px;height:150px;border-radius:8px;object-fit:cover;border:1px solid #ddd}
+  .cardText{white-space:pre-wrap;font-family:inherit;font-size:14px;color:#111;line-height:1.35;flex:1}
+  .cardRight{width:300px;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+  .thumb{width:260px;height:160px;border-radius:8px;object-fit:cover;border:1px solid #ddd}
   .link{color:#0b66ff;text-decoration:none;font-weight:600}
-  .small{font-size:13px;color:var(--muted)}
   .btn-small{padding:6px 8px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer}
 </style>
 </head>
 <body>
-<h1>💳 LIGHTRI — Trieur (bincheck.io + agence)</h1>
-<div class="note">Colle tes fiches (ou charge un .txt). Format : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code>.</div>
+<h1>💳 LIGHTRI — Fiches + Placeholder</h1>
+<div class="note">Colle ton texte ou charge un .txt. Format attendu par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code></div>
 
 <div class="controls">
   <input id="file" type="file" accept=".txt,.json" />
   <button id="process">Traiter</button>
   <button id="download">Télécharger fiches</button>
-  <button id="loadExample">Charger exemple</button>
 </div>
 
 <div class="small">Progrès <span id="counter">0/0</span> — <span id="status">Prêt</span></div>
@@ -44,13 +41,9 @@
 <div id="cardsGrid"></div>
 
 <script>
-/* CONFIG */
 const BIN_API_BASE = 'https://bincheck.io/api/v1/bin/';
 const NOMINATIM_SEARCH = 'https://nominatim.openstreetmap.org/search';
-const NOMINATIM_REVERSE = 'https://nominatim.openstreetmap.org/reverse';
-const USE_NOMINATIM = true; // si false, on n'essaie pas de géocoder
 
-/* UI */
 const inputBox = document.getElementById('input');
 const fileInput = document.getElementById('file');
 const cardsGrid = document.getElementById('cardsGrid');
@@ -58,343 +51,141 @@ const progressBar = document.getElementById('progressBar');
 const counterEl = document.getElementById('counter');
 const statusEl = document.getElementById('status');
 
-function setStatus(s){ statusEl.textContent = s; }
-function updateProgress(done,total){ counterEl.textContent = `${done}/${total}`; progressBar.style.width = Math.round((done/total)*100)+'%'; }
-
-/* helpers */
+function setStatus(s){ statusEl.textContent=s; }
+function updateProgress(done,total){ counterEl.textContent=`${done}/${total}`; progressBar.style.width = total? (done/total*100)+'%':'0%'; }
 function digitsOnly(s){ return (s||'').toString().replace(/\D/g,''); }
 function groupCard(n){ return digitsOnly(n).replace(/(\d{4})(?=\d)/g,'$1 '); }
-function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function haversineKm(lat1,lon1,lat2,lon2){
-  const toRad = v => v*Math.PI/180;
-  const R = 6371;
-  const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R*c;
-}
+function countryCodeToEmoji(cc){ if(!cc) return ''; cc=cc.toUpperCase(); if(cc.length!==2)return ''; const A=0x1F1E6; return String.fromCodePoint(A+cc.charCodeAt(0)-65,A+cc.charCodeAt(1)-65); }
 
-/* fetch bin info from bincheck.io */
 async function fetchBinInfo(bin){
   try{
     const r = await fetch(BIN_API_BASE + encodeURIComponent(bin));
     if(!r.ok) throw new Error('HTTP '+r.status);
-    const j = await r.json();
-    // bincheck returns fields: scheme, type, brand, bank:{name}, country:{name}, etc
-    return j;
-  }catch(e){
-    console.warn('BIN fetch failed', e);
-    return null;
-  }
+    return await r.json();
+  }catch(e){ console.warn('fetchBinInfo failed',e); return null; }
 }
 
-/* geocode client address via Nominatim (returns {lat,lon,display_name} or null) */
-async function geocodeAddress(address, city, zip){
-  if(!USE_NOMINATIM) return null;
+async function geocode(address, city, zip){
   const q = [address, city, zip, 'France'].filter(Boolean).join(' ');
-  const url = `${NOMINATIM_SEARCH}?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1`;
   try{
-    const r = await fetch(url, {headers:{'Accept-Language':'fr'}});
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    const r = await fetch(`${NOMINATIM_SEARCH}?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1`);
+    if(!r.ok) return null;
     const arr = await r.json();
-    if(arr && arr.length>0) return { lat: parseFloat(arr[0].lat), lon: parseFloat(arr[0].lon), display_name: arr[0].display_name };
-  }catch(e){ console.warn('geocode fail', e); }
+    if(arr && arr.length>0) return { lat:parseFloat(arr[0].lat), lon:parseFloat(arr[0].lon), display_name:arr[0].display_name };
+  }catch(e){ console.warn('geocode failed', e); }
   return null;
 }
 
-/* search for branches of bankName near coordinates or city using Nominatim (returns best match or null) */
-async function findNearestBranch(bankName, city, originCoords){
-  if(!USE_NOMINATIM) return null;
-  // first try searching "BankName bank City"
+async function findBankBranch(bankName, city){
   const q = `${bankName} agence ${city} France`;
-  const url = `${NOMINATIM_SEARCH}?q=${encodeURIComponent(q)}&format=json&limit=10&addressdetails=1`;
   try{
-    const r = await fetch(url, {headers:{'Accept-Language':'fr'}});
-    if(!r.ok) throw new Error('HTTP '+r.status);
+    const r = await fetch(`${NOMINATIM_SEARCH}?q=${encodeURIComponent(q)}&format=json&limit=1&addressdetails=1`);
+    if(!r.ok) return null;
     const arr = await r.json();
-    if(arr && arr.length>0){
-      // if we have origin coords, compute distances and pick nearest
-      if(originCoords){
-        let best = null;
-        for(const a of arr){
-          const lat = parseFloat(a.lat), lon = parseFloat(a.lon);
-          const d = haversineKm(originCoords.lat, originCoords.lon, lat, lon);
-          if(!best || d < best.d) best = { lat, lon, display_name: a.display_name, d };
-        }
-        return best;
-      } else {
-        const a = arr[0];
-        return { lat: parseFloat(a.lat), lon: parseFloat(a.lon), display_name: a.display_name, d: null };
-      }
-    }
-  }catch(e){ console.warn('branch search fail', e); }
+    if(arr && arr.length>0) return arr[0].display_name;
+  }catch(e){ console.warn('findBankBranch failed', e); }
   return null;
 }
 
-/* Build Google Maps URLs:
-   - search: https://www.google.com/maps/search/?api=1&query=Bank+Name+City
-   - directions: https://www.google.com/maps/dir/?api=1&origin=ORIGIN&destination=DEST
-*/
-function mapsSearchUrl(bankName, city){
-  const q = encodeURIComponent(`${bankName} agence ${city} France`);
-  return `https://www.google.com/maps/search/?api=1&query=${q}`;
-}
-function mapsDirectionsUrl(origin, dest){
-  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
-}
-
-/* Estimate travel time simple heuristic:
-   - driving speed 50 km/h, walking 5 km/h
-   returns { distance_km, drive_min, walk_min }
-*/
-function estimateTimesKm(distance_km){
-  const drive_min = Math.round((distance_km/50)*60);
-  const walk_min = Math.round((distance_km/5)*60);
-  return { distance_km: Number(distance_km.toFixed(2)), drive_min, walk_min };
-}
-
-/* Build the output block exactly as desired, and include Maps links and Nominatim found agency if available */
-function buildFicheText(carte, binInfo, nearestBranch, originCoords){
-  const bank = (binInfo && (binInfo.bank && binInfo.bank.name)) || carte.BankField || 'Non spécifié';
-  const level = binInfo && binInfo.brand ? binInfo.brand.toUpperCase() : (binInfo && binInfo.level ? String(binInfo.level).toUpperCase() : 'Non spécifié');
-  const type = (binInfo && binInfo.type) ? binInfo.type.toUpperCase() : 'Non spécifié';
-  const country = (binInfo && binInfo.country && binInfo.country.name) ? binInfo.country.name : (binInfo && binInfo.country ? binInfo.country : 'Non spécifié');
-
-  const lines = [];
-  lines.push('💳 +1 IMPO.UHQ');
-  lines.push('└ ' + groupCard(carte.CardNumber));
+function buildFicheText(carte, binInfo, branchAddress){
+  const bank = (binInfo && binInfo.bank && binInfo.bank.name)?binInfo.bank.name:(carte.BankField||'Non spécifié');
+  const brand = (binInfo && (binInfo.brand||binInfo.level))?(binInfo.brand||binInfo.level):'CLASSIC';
+  const type = (binInfo && binInfo.type)?binInfo.type:'Non spécifié';
+  const countryCode = (binInfo && binInfo.country && binInfo.country.alpha2)?binInfo.country.alpha2:'';
+  const flag = countryCodeToEmoji(countryCode);
+  const lines=[];
+  lines.push(`💳 +1 IMPO.UHQ ${flag}`);
+  lines.push('└ '+groupCard(carte.CardNumber));
   lines.push('');
   lines.push('🏦 Informations Personnelles');
-  lines.push('├ 🕵️ Nom complet : ' + (carte.FullName || ''));
-  lines.push('├ 🏠 Adresse : ' + (carte.Address || ''));
-  lines.push('├ 📮 Zip : ' + (carte.Zip || ''));
-  lines.push('├ 🏢 Ville : ' + (carte.City || ''));
-  lines.push('├ 📞 Numéro de téléphone : ' + (carte.Phone || ''));
-  lines.push('└ 📧 Email : ' + (carte.Email || 'Non fourni'));
+  lines.push('├ 🕵️ Nom complet : '+(carte.FullName||''));
+  lines.push('├ 🏠 Adresse : '+(carte.Address||''));
+  lines.push('├ 📮 Zip : '+(carte.Zip||''));
+  lines.push('├ 🏢 Ville : '+(carte.City||''));
+  lines.push('├ 📞 Numéro de téléphone : '+(carte.Phone||''));
+  lines.push('└ 📧 Email : '+(carte.Email||'Non fourni'));
   lines.push('');
   lines.push('🏦 Carte de Paiement');
-  lines.push('├ 🍒 Titulaire : ' + (carte.FullName || ''));
-  lines.push('├ 💳 Numéro de carte : ' + groupCard(carte.CardNumber));
-  lines.push('├ 💳 Bin : ' + (carte.BIN || ''));
-  lines.push('├ 💳 Banque : ' + bank);
-  lines.push('├ 💳 Niveau : ' + level);
-  lines.push('├ 💳 Type : ' + type);
-  // agency info
-  if(nearestBranch && nearestBranch.display_name){
-    const dist = nearestBranch.d !== undefined && originCoords ? estimateTimesKm(nearestBranch.d) : null;
-    lines.push('├ 🏦 Agence : ' + (nearestBranch.display_name.split(',')[0] || nearestBranch.display_name));
-    lines.push('├ 🏷️ Adresse agence : ' + (nearestBranch.display_name || 'Non spécifiée'));
-    if(dist){
-      lines.push('├ 🚗 Distance (approx.) : ' + dist.distance_km + ' km');
-      lines.push('├ ⏱️ Est. trajet (voiture) : ' + dist.drive_min + ' min');
-      lines.push('├ 🚶 Est. trajet (à pied) : ' + dist.walk_min + ' min');
-    } else {
-      lines.push('├ 🚗 Distance (approx.) : Non disponible');
-    }
-    // Google Maps links
-    const mapsSearch = mapsSearchUrl(bank, carte.City || '');
-    const originStr = [carte.Address, carte.City, carte.Zip, 'France'].filter(Boolean).join(' ');
-    const destStr = nearestBranch.display_name || (bank + ' ' + (carte.City || ''));
-    const mapsDir = mapsDirectionsUrl(originStr, destStr);
-    lines.push('└ 🎨 Visuel : ' + placeholderImageUrl(bank, level));
-    lines.push('');
-    lines.push('🔗 Ouvrir agence (Maps) : ' + mapsSearch);
-    lines.push('🔗 Itinéraire (Maps) : ' + mapsDir);
-  } else {
-    // no branch found: provide maps search link
-    lines.push('├ 🏦 Agence : Non trouvée automatiquement');
-    lines.push('└ 🎨 Visuel : ' + placeholderImageUrl(bank, level));
-    const mapsSearch = mapsSearchUrl(bank, carte.City || carte.Address || '');
-    lines.push('');
-    lines.push('🔗 Rechercher agence (Maps) : ' + mapsSearch);
-  }
-
-  lines.push('├ 📅 Expiration : ' + (carte.ExpMonth || '') + '/' + (carte.ExpYear || ''));
-  lines.push('└ 🔒 Cryptogramme visuel : ' + (carte.CVV || ''));
-
+  lines.push('├ 🍒 Titulaire : '+(carte.FullName||''));
+  lines.push('├ 💳 Numéro de carte : '+groupCard(carte.CardNumber));
+  lines.push('├ 💳 Bin : '+(carte.BIN||''));
+  lines.push('├ 💳 Banque : '+bank);
+  lines.push('├ 💳 Niveau : '+brand.toUpperCase());
+  lines.push('├ 💳 Type : '+type.toUpperCase());
+  lines.push('├ 🏷️ Adresse agence : '+(branchAddress||'Non trouvée'));
+  lines.push('├ 🎨 Visuel : (lien ci-dessous)');
+  lines.push('├ 📅 Expiration : '+(carte.ExpMonth||'')+'/'+(carte.ExpYear||''));
+  lines.push('└ 🔒 Cryptogramme visuel : '+(carte.CVV||''));
   return lines.join('\n');
 }
 
-/* placeholder image URL builder */
-function placeholderImageUrl(bank, level){
-  const label = `${bank} ${level}`.trim();
-  // 400x250 placeholder
-  return `https://via.placeholder.com/400x250.png?text=${encodeURIComponent(label)}`;
-}
-
-/* parse input lines */
-function parseLines(text){
-  return text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(line=>{
-    // remove leading very long numeric id if any (as in original)
-    const cleaned = line.replace(/^\d{8,}\s*/, "");
-    if(!cleaned.includes("|")) return null;
-    return cleaned;
-  }).filter(Boolean);
-}
-
-/* main process */
 async function processText(text){
-  cardsGrid.innerHTML = '';
+  cardsGrid.innerHTML='';
   setStatus('Traitement...');
-  progressBar = document.getElementById('progressBar');
-
-  const lines = parseLines(text);
-  if(lines.length===0){ alert('Aucune fiche valide trouvée (séparateurs | attendus).'); setStatus('Aucune fiche'); return; }
-
-  const total = lines.length;
-  let done = 0;
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){ setStatus('Aucune fiche'); return; }
+  let done=0;
+  const total=lines.length;
   updateProgress(done,total);
 
-  const BATCH = 6;
-  for(let start=0; start<lines.length; start+=BATCH){
-    const batch = lines.slice(start, start+BATCH);
-    await Promise.all(batch.map(async (line, idx)=>{
-      const parts = line.split('|').map(p=>p.trim());
-      while(parts.length<12) parts.push('');
-      const carte = {
-        CardNumber: parts[0],
-        ExpMonth: parts[1],
-        ExpYear: parts[2],
-        CVV: parts[3],
-        BankField: parts[4],
-        FullName: parts[5],
-        Address: parts[6],
-        City: parts[7],
-        Region: parts[8],
-        Zip: parts[9],
-        Phone: parts[10],
-        Email: parts[11]
-      };
-      const digits = digitsOnly(carte.CardNumber);
-      if(digits.length < 13 || digits.length > 19){
-        // create cardWrap with error note
-        const wrap = document.createElement('div'); wrap.className='cardWrap';
-        const txt = document.createElement('div'); txt.className='cardText';
-        txt.textContent = `⚠️ Fiche invalide (#${start+idx+1}): numéro de carte incorrect (longueur ${digits.length}). Ligne ignorée.`;
-        wrap.appendChild(txt); cardsGrid.appendChild(wrap);
-        done++; updateProgress(done,total); return;
-      }
-      carte.BIN = digits.slice(0,6);
+  for(const line of lines){
+    const parts=line.split('|').map(p=>p.trim());
+    while(parts.length<12) parts.push('');
+    const carte={
+      CardNumber:parts[0],
+      ExpMonth:parts[1],
+      ExpYear:parts[2],
+      CVV:parts[3],
+      BankField:parts[4],
+      FullName:parts[5],
+      Address:parts[6],
+      City:parts[7],
+      Region:parts[8],
+      Zip:parts[9],
+      Phone:parts[10],
+      Email:parts[11]
+    };
+    const digits=digitsOnly(carte.CardNumber);
+    if(digits.length<13){ done++; updateProgress(done,total); continue; }
+    carte.BIN=digits.slice(0,6);
 
-      // fetch bin info
-      const binInfo = await fetchBinInfo(carte.BIN);
+    const binInfo=await fetchBinInfo(carte.BIN);
+    const branchAddress = await findBankBranch(binInfo && binInfo.bank && binInfo.bank.name ? binInfo.bank.name : carte.BankField, carte.City);
 
-      // geocode client
-      let originCoords = null;
-      if(USE_NOMINATIM){
-        try{ originCoords = await geocodeAddress(carte.Address, carte.City, carte.Zip);}catch(e){ originCoords=null; }
-      }
+    const ficheText=buildFicheText(carte, binInfo, branchAddress);
 
-      // search nearest branch of same bank
-      let nearest = null;
-      const bankName = (binInfo && binInfo.bank && binInfo.bank.name) ? binInfo.bank.name : (carte.BankField || '');
-      if(bankName){
-        try{ nearest = await findNearestBranch(bankName, carte.City || carte.Zip || '', originCoords); }catch(e){ nearest = null; }
-      }
+    // DOM
+    const wrap=document.createElement('div'); wrap.className='cardWrap';
+    const left=document.createElement('div'); left.className='cardText'; left.textContent=ficheText;
+    const right=document.createElement('div'); right.className='cardRight';
 
-      // build SVG placeholder image url and blob for quick preview (we use placeholder.com image)
-      const imageUrl = placeholderImageUrl(bankName || 'BANQUE', (binInfo && binInfo.brand) ? binInfo.brand : (binInfo && binInfo.level) ? binInfo.level : '');
+    // placeholder image with bank name + brand + type
+    const img=document.createElement('img'); img.className='thumb';
+    const textLabel = encodeURIComponent(`${binInfo && binInfo.bank && binInfo.bank.name?binInfo.bank.name:carte.BankField} ${binInfo && (binInfo.brand||binInfo.level)?binInfo.brand||binInfo.level:'CLASSIC'} ${binInfo && binInfo.type?binInfo.type:'CREDIT'}`);
+    img.src=`https://via.placeholder.com/260x160.png?text=${textLabel}`;
+    img.alt='Visuel carte';
 
-      // build fiche text
-      const ficheText = buildFicheText(carte, binInfo, nearest, originCoords);
+    right.appendChild(img);
+    wrap.appendChild(left);
+    wrap.appendChild(right);
+    cardsGrid.appendChild(wrap);
 
-      // create DOM
-      const wrap = document.createElement('div'); wrap.className='cardWrap';
-      const left = document.createElement('div'); left.className='cardText'; left.textContent = ficheText;
-      const right = document.createElement('div'); right.className='cardRight';
-
-      const img = document.createElement('img'); img.className='thumb'; img.src = imageUrl; img.alt='Visuel carte';
-      const openLink = document.createElement('a'); openLink.href = imageUrl; openLink.target = '_blank'; openLink.className='link'; openLink.textContent = '🎨 Visuel (ouvrir image)';
-      const downloadBtn = document.createElement('button'); downloadBtn.className='btn-small'; downloadBtn.textContent = 'Télécharger image';
-      downloadBtn.addEventListener('click', ()=>{
-        const a = document.createElement('a'); a.href = imageUrl; a.download = `card_${carte.BIN || 'bin' }_${digits.slice(-4)}.png`; document.body.appendChild(a); a.click(); a.remove();
-      });
-
-      right.appendChild(img); right.appendChild(openLink); right.appendChild(downloadBtn);
-      wrap.appendChild(left); wrap.appendChild(right);
-      cardsGrid.appendChild(wrap);
-
-      done++; updateProgress(done,total);
-    }));
-    // small delay to keep UI responsive
-    await new Promise(r=>setTimeout(r,80));
+    done++; updateProgress(done,total);
   }
-
-  setStatus('Terminé');
+  setStatus('Terminé — '+total+' fiches.');
 }
 
-/* UI events */
-document.getElementById('process').addEventListener('click', async ()=>{
-  const t = inputBox.value.trim();
-  if(t) await processText(t);
-  else if(fileInput.files.length>0){
-    const f = fileInput.files[0];
-    const txt = await f.text();
-    inputBox.value = txt;
-    await processText(txt);
-  } else alert('Colle ton texte ou charge un fichier .txt');
+document.getElementById('process').addEventListener('click',()=>processText(inputBox.value.trim()));
+document.getElementById('download').addEventListener('click',()=>{
+  const texts=Array.from(document.querySelectorAll('.cardText')).map(n=>n.textContent);
+  if(!texts.length){ alert('Rien à télécharger'); return; }
+  const blob=new Blob([texts.join('\n\n')],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='LIGHTRI_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
 });
-
-document.getElementById('loadExample').addEventListener('click', ()=>{
-  inputBox.value = [
-    "4974027540458210 | 07 | 2027 | 575 | FRANCE | António Lamego | 5 Rue de la Voie Verte | Juvisy-sur-Orge | Ile-de-France | 91260 | 0615788638 | ",
-    "5539791646892300 | 12 | 2025 | 257 | FRANCE | Kelly Yang | 23 Rue Paul Auster | Thiais | Val-de-Marne | 94320 | 0652894389 | kellyyang@outlook.fr",
-    "5133791059685621 | 02 | 2026 | 500 | FRANCE | Dicanot | 42 boulevard Dubreuil | Bures-sur-Yvette | Essonne | 91440 | 0782714931 | idicanot@gmail.com"
-  ].join("\n");
-});
-
-document.getElementById('download').addEventListener('click', ()=>{
-  const blocks = Array.from(document.querySelectorAll('.cardText')).map(n=>n.textContent);
-  if(blocks.length===0){ alert('Rien à télécharger.'); return; }
-  const blob = new Blob([blocks.join('\n\n')], { type:'text/plain;charset=utf-8' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'LIGHTRI_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
-});
-
-/* file input: load txt or bins.json */
 fileInput.addEventListener('change', async (e)=>{
-  const f = e.target.files[0];
-  if(!f) return;
-  if(f.name.toLowerCase().endsWith('.txt')){
-    const txt = await f.text();
-    inputBox.value = txt;
-    await processText(txt);
-  } else if(f.name.toLowerCase().endsWith('.json')){
-    // allow the user to load a bins.json (structure mapping 6-digit->info)
-    try{
-      const txt = await f.text();
-      const parsed = JSON.parse(txt);
-      if(parsed && typeof parsed === 'object'){
-        // merge into local BINS by overriding a runtime map used by fetchBinInfo
-        // We'll replace fetchBinInfo implementation to use this map if present.
-        window.__USER_BINS_JSON = parsed;
-        alert('bins.json chargé en local ; il sera utilisé pour trouver banque/etc.');
-      } else alert('JSON invalide');
-    }catch(err){ alert('Erreur lecture JSON: '+err.message); }
-  } else {
-    // fallback: read and put into textarea
-    const txt = await f.text();
-    inputBox.value = txt;
-  }
+  const f=e.target.files[0]; if(!f) return;
+  const txt=await f.text(); inputBox.value=txt; processText(txt);
 });
-
-/* override fetchBinInfo to use loaded bins.json if present */
-const origFetchBinInfo = fetchBinInfo;
-async function fetchBinInfo(bin){
-  try{
-    if(window.__USER_BINS_JSON && window.__USER_BINS_JSON[bin]){
-      // mimic bincheck.io response shape partially
-      const v = window.__USER_BINS_JSON[bin];
-      return {
-        scheme: v.scheme || v.card || v.brand || null,
-        type: v.type || null,
-        brand: v.brand || v.level || null,
-        bank: { name: v.bank || v.bank_name || null },
-        country: { name: v.country || v.country_name || 'France' }
-      };
-    }
-  }catch(e){}
-  return origFetchBinInfo(bin);
-}
 </script>
 </body>
 </html>
