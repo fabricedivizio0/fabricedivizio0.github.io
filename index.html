@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>LIGHTRI — Fiches sobres (validation BIN minimale)</title>
+<title>LIGHTRI — Fiches (bins.json local + Binlist fallback)</title>
 <style>
 body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:#f8f9fb;color:#111;margin:0;padding:20px}
 h1{margin:0 0 8px 0;font-weight:600}
@@ -20,13 +20,16 @@ button{padding:8px 12px;border-radius:8px;border:1px solid #999;background:#fff;
 #errorLog{height:140px;background:#fff0f0;border:1px solid #f99;padding:8px;overflow:auto;font-size:13px;color:#900;white-space:pre-wrap;margin-top:12px;border-radius:6px;}
 .small{font-size:13px;color:#666}
 code{background:#f4f4f6;padding:2px 6px;border-radius:4px}
+.link{color:#0b66ff;text-decoration:none}
 </style>
 </head>
 <body>
-<h1>💳 LIGHTRI — Fiches sobres</h1>
+<h1>💳 LIGHTRI — Fiches (local bins + Binlist)</h1>
+
 <div class="note">
-  Colle ton texte ou charge un fichier <code>.txt</code>.  
-  Format par ligne : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code>
+  - Le script utilise une **base locale `bins.json` embarquée** pour les BINs (prioritaire).<br>
+  - Si le BIN n'est pas trouvé localement, **Binlist** est utilisé en fallback. (public, quotas).<br>
+  - Format par ligne attendu : <code>CardNumber | MM | YYYY | CVV | BankField | FullName | Address | City | Region | Zip | Phone | Email</code>
 </div>
 
 <div class="controls">
@@ -47,10 +50,24 @@ code{background:#f4f4f6;padding:2px 6px;border-radius:4px}
 <div id="errorLog" aria-live="polite"></div>
 
 <script>
-/* CONFIG */
-const BINLIST_BASE = 'https://lookup.binlist.net/'; // Binlist public
+/* ---------- CONFIG ---------- */
+const BINLIST_BASE = 'https://lookup.binlist.net/'; // fallback
 
-/* UI refs */
+/* ---------- Embedded local bins.json (exemples + quelques BIN FR utiles) ---------- */
+/* Format : "123456": { bank: "...", brand: "...", type: "...", country: "France" } */
+const LOCAL_BINS_EMBEDDED = {
+  // examples you gave (6-digit BIN -> info)
+  "497040": {"bank":"CRÉDIT AGRICOLE","brand":"CLASSIC","type":"DEBIT","country":"France"},
+  "513379": {"bank":"BNP PARIBAS","brand":"CLASSIC","type":"CREDIT","country":"France"},
+  "553979": {"bank":"SOCIETE GENERALE","brand":"CLASSIC","type":"DEBIT","country":"France"},
+  // a few additional common FR BINs (illustrative — add/extend as needed)
+  "457631": {"bank":"BANQUE FRANCAISE","brand":"GOLD","type":"CREDIT","country":"France"},
+  "402360": {"bank":"LCL","brand":"CLASSIC","type":"DEBIT","country":"France"},
+  "497011": {"bank":"BPCE","brand":"GOLD","type":"CREDIT","country":"France"}
+};
+/* You can replace or augment LOCAL_BINS_EMBEDDED by loading a bins.json file via file input. */
+
+/* ---------- UI refs ---------- */
 const inputBox = document.getElementById('input');
 const fileInput = document.getElementById('file');
 const cardsGrid = document.getElementById('cardsGrid');
@@ -59,17 +76,41 @@ const counterEl = document.getElementById('counter');
 const statusEl = document.getElementById('status');
 const errorLog = document.getElementById('errorLog');
 
+/* ---------- Helpers ---------- */
 function setStatus(s){ statusEl.textContent = s; }
 function updateProgress(done,total){ counterEl.textContent = `${done}/${total}`; progressBar.style.width = total ? Math.round((done/total)*100) + '%' : '0%'; }
 function digitsOnly(s){ return (s||'').toString().replace(/\D/g,''); }
 function groupCard(num){ return digitsOnly(num).replace(/(\d{4})(?=\d)/g,'$1 '); }
 function logError(msg){ errorLog.textContent += msg + '\\n'; errorLog.scrollTop = errorLog.scrollHeight; }
 
-/* fetch BIN info (Binlist) */
+/* ---------- Runtime local bins (may be overwritten by loaded bins.json) ---------- */
+window.__LOCAL_BINS = Object.assign({}, LOCAL_BINS_EMBEDDED);
+
+/* ---------- fetchBinInfo: check local first, then fallback to Binlist ---------- */
 async function fetchBinInfo(bin){
   try{
+    // local override first
+    if(window.__LOCAL_BINS && window.__LOCAL_BINS[bin]){
+      const v = window.__LOCAL_BINS[bin];
+      return {
+        bankName: v.bank || v.bank_name || v.bankName || 'Non spécifié',
+        brand: v.brand || v.level || v.scheme || 'CLASSIC',
+        type: (v.type || '').toUpperCase() || 'CREDIT',
+        country: v.country || v.country_name || v.countryCode || ''
+      };
+    }
+  }catch(e){
+    // ignore parsing errors, fall back to remote
+  }
+
+  // fallback to Binlist public API
+  try{
     const res = await fetch(BINLIST_BASE + encodeURIComponent(bin), { headers: { 'Accept-Version':'3' }});
-    if(!res.ok) throw new Error('HTTP ' + res.status);
+    if(!res.ok){
+      // don't flood error log for 404s; record concise message
+      logError(`BIN ${bin} non trouvé sur Binlist (HTTP ${res.status}) — valeurs locales absent/es utilisées.`);
+      return { bankName:'Non spécifié', brand:'CLASSIC', type:'CREDIT', country:'' };
+    }
     const j = await res.json();
     return {
       bankName: j.bank?.name || j.bank || 'Non spécifié',
@@ -77,13 +118,13 @@ async function fetchBinInfo(bin){
       type: (j.type || '').toUpperCase() || 'CREDIT',
       country: j.country?.name || j.country?.alpha2 || ''
     };
-  }catch(e){
-    logError('Erreur BIN ' + bin + ' : ' + e.message);
+  }catch(err){
+    logError(`Erreur fetch Binlist ${bin} : ${err.message}`);
     return { bankName:'Non spécifié', brand:'CLASSIC', type:'CREDIT', country:'' };
   }
 }
 
-/* build fiche text */
+/* ---------- Parsing & formatting ---------- */
 function buildFicheText(carte, binInfo){
   const lines = [];
   lines.push('💳 +1 IMPO.UHQ');
@@ -101,17 +142,16 @@ function buildFicheText(carte, binInfo){
   lines.push('├ 🍒 Titulaire : ' + (carte.FullName || ''));
   lines.push('├ 💳 Numéro de carte : ' + groupCard(carte.CardNumber));
   lines.push('├ 💳 Bin : ' + (carte.BIN || ''));
-  lines.push('├ 💳 Banque : ' + binInfo.bankName);
-  lines.push('├ 💳 Niveau : ' + binInfo.brand.toUpperCase());
-  lines.push('├ 💳 Type : ' + binInfo.type.toUpperCase());
+  lines.push('├ 💳 Banque : ' + (binInfo.bankName || carte.BankField || 'Non spécifié'));
+  lines.push('├ 💳 Niveau : ' + (binInfo.brand || 'CLASSIC').toString().toUpperCase());
+  lines.push('├ 💳 Type : ' + (binInfo.type || 'CREDIT').toString().toUpperCase());
   lines.push('├ 📅 Expiration : ' + (carte.ExpMonth || '') + '/' + (carte.ExpYear || ''));
   lines.push('└ 🔒 Cryptogramme visuel : ' + (carte.CVV || ''));
   return lines.join('\\n');
 }
 
-/* parse lines and keep original cleaning rule */
 function parseLines(text){
-  return text.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean).map(line => {
+  return text.split(/\\r?\\n/).map(l => l.trim()).filter(Boolean).map(line=>{
     const cleaned = line.replace(/^\\d{8,}\\s*/, "");
     if(!cleaned.includes("|")){
       logError('Ignoré (pas de séparateur "|") : ' + line);
@@ -121,7 +161,7 @@ function parseLines(text){
   }).filter(Boolean);
 }
 
-/* main processor: validation relaxed -> only require 6 digits for BIN */
+/* ---------- Main processor ---------- */
 async function processText(raw){
   cardsGrid.innerHTML = '';
   errorLog.textContent = '';
@@ -132,11 +172,10 @@ async function processText(raw){
   const total = lines.length;
   updateProgress(done,total);
 
-  // small batches to avoid hammering public API
   const BATCH = 6;
   for(let i=0;i<lines.length;i+=BATCH){
-    const batch = lines.slice(i, i+BATCH);
-    await Promise.all(batch.map(async (line) => {
+    const batch = lines.slice(i,i+BATCH);
+    await Promise.all(batch.map(async line => {
       const parts = line.split('|').map(p => p.trim());
       while(parts.length < 12) parts.push('');
       const carte = {
@@ -155,7 +194,6 @@ async function processText(raw){
       };
 
       const digits = digitsOnly(carte.CardNumber);
-      // now require only at least 6 digits to extract BIN
       if(digits.length < 6){
         logError('Carte ignorée (trop courte pour BIN) : ' + carte.CardNumber);
         done++; updateProgress(done,total);
@@ -163,11 +201,9 @@ async function processText(raw){
       }
       carte.BIN = digits.slice(0,6);
 
-      // fetch bin info (Binlist)
       const binInfo = await fetchBinInfo(carte.BIN);
       const fiche = buildFicheText(carte, binInfo);
 
-      // append to UI
       const wrap = document.createElement('div'); wrap.className = 'cardWrap';
       const txt = document.createElement('div'); txt.className = 'cardText'; txt.textContent = fiche;
       wrap.appendChild(txt);
@@ -175,14 +211,13 @@ async function processText(raw){
 
       done++; updateProgress(done,total);
     }));
-    // polite pause
-    await new Promise(r => setTimeout(r, 120));
+    await new Promise(r => setTimeout(r, 120)); // polite pause
   }
 
   setStatus('Terminé — ' + total + ' fiches.');
 }
 
-/* UI wiring */
+/* ---------- UI wiring ---------- */
 document.getElementById('process').addEventListener('click', () => processText(inputBox.value.trim()));
 
 document.getElementById('download').addEventListener('click', () => {
@@ -192,44 +227,32 @@ document.getElementById('download').addEventListener('click', () => {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'LIGHTRI_fiches.txt'; document.body.appendChild(a); a.click(); a.remove();
 });
 
-/* file load */
 fileInput.addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if(!f) return;
   if(f.name.toLowerCase().endsWith('.json')){
-    // optional: load local bins.json to override binlookups (not mandatory)
+    // load bins.json locally and override window.__LOCAL_BINS
     try{
       const txt = await f.text();
       const parsed = JSON.parse(txt);
       if(parsed && typeof parsed === 'object'){
-        window.__USER_BINS = parsed;
-        alert('bins.json chargé localement (utilisé pour lookups si présent).');
-        // override fetchBinInfo to check __USER_BINS first
-        const orig = fetchBinInfo;
-        window.fetchBinInfo = async function(bin){
-          try{
-            if(window.__USER_BINS && window.__USER_BINS[bin]){
-              const v = window.__USER_BINS[bin];
-              return {
-                bankName: v.bank || v.bank_name || v.bankName || '',
-                brand: v.brand || v.level || v.scheme || '',
-                type: (v.type || '').toUpperCase() || '',
-                country: v.country || v.country_name || v.country_code || ''
-              };
-            }
-          }catch(e){}
-          return orig(bin);
-        };
-      } else alert('JSON bins invalide');
-    }catch(err){ alert('Erreur lecture JSON: ' + err.message); }
+        window.__LOCAL_BINS = parsed;
+        alert('bins.json chargé localement — utilisé prioritairement pour lookups.');
+      } else {
+        alert('JSON invalide (attendu mapping BIN -> info).');
+      }
+    }catch(err){
+      alert('Erreur lecture JSON: ' + err.message);
+    }
     return;
   }
+  // otherwise treat as text file
   const txt = await f.text();
   inputBox.value = txt;
   processText(txt);
 });
 
-/* load example */
+/* load sample (and auto-run) */
 document.getElementById('loadExample').addEventListener('click', ()=>{
   inputBox.value = [
     "4970407109386230 | 01 | 2026 | 116 | CRÉDIT AGRICOLE | Remi Vallette | 18 avenue linn | Savigny sur orge | Ile-de-France | 91600 | 0684204360 | remi.vallette@gmail.com",
